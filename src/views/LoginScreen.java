@@ -285,15 +285,9 @@ public class LoginScreen extends JFrame {
                                     + role,
                             "Login Successful",
                             JOptionPane.INFORMATION_MESSAGE);
-                    /*
-                     * FUTURE STEP:
-                     * 
-                     * if(role.equals("Doctor"))
-                     * new DoctorDashboard().setVisible(true);
-                     * 
-                     * if(role.equals("Nurse"))
-                     * new NurseDashboard().setVisible(true);
-                     */
+                   new DashboardScreen(
+                        firstName + " " + lastName, role ).setVisible(true);
+                        dispose();
 
                 } else {
                     // Password was incorrect
