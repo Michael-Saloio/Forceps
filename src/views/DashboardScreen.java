@@ -1,6 +1,6 @@
 package views;
 
-import db.Database;
+import database.DatabaseConnection;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
@@ -137,7 +137,7 @@ public class DashboardScreen extends JFrame {
 
                 try {
 
-                    java.util.List<String[]> patients = Database.searchPatient(name, birth);
+                    java.util.List<String[]> patients = searchPatient(name, birth);
 
                     for (String[] patient : patients) {
                         model.addRow(patient);
@@ -201,5 +201,34 @@ public class DashboardScreen extends JFrame {
             panel.add(new JButton("Employee Offboarding"));
         }
         return panel;
+    }
+        private java.util.List<String[]> searchPatient(String name, String birth)
+            throws SQLException {
+
+        java.util.List<String[]> patients = new java.util.ArrayList<>();
+
+        String sql = "SELECT patient_id, first_name, last_name, " +
+                     "date_of_birth, phone FROM PATIENT " +
+                     "WHERE last_name = ? AND date_of_birth = ?";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, name);
+            stmt.setDate(2, java.sql.Date.valueOf(birth));
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    patients.add(new String[] {
+                        rs.getString("patient_id"),
+                        rs.getString("first_name") + " " + rs.getString("last_name"),
+                        rs.getString("date_of_birth"),
+                        rs.getString("phone")
+                    });
+                }
+            }
+        }
+
+        return patients;
     }
 }
