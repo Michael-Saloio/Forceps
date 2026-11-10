@@ -1,16 +1,19 @@
 package views;
+
 import db.Database;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.*;
 import java.sql.*;
+
 public class DashboardScreen extends JFrame {
 
     JPanel mainPanel;
     CardLayout layout;
     String staffName;
     String role;
+
     public DashboardScreen(String name, String userRole) {
 
         staffName = name;
@@ -112,7 +115,7 @@ public class DashboardScreen extends JFrame {
         top.add(dob);
         top.add(searchButton);
 
-        String[] columns = {"ID", "Name", "DOB", "Phone"};
+        String[] columns = { "ID", "Name", "DOB", "Phone" };
 
         DefaultTableModel model = new DefaultTableModel(columns, 0);
         JTable table = new JTable(model);
@@ -127,16 +130,14 @@ public class DashboardScreen extends JFrame {
 
                 if (name.isEmpty() || birth.isEmpty()) {
                     JOptionPane.showMessageDialog(
-                        DashboardScreen.this,
-                        "Please enter last name and date of birth."
-                    );
+                            DashboardScreen.this,
+                            "Please enter last name and date of birth.");
                     return;
                 }
 
                 try {
 
-                    java.util.List<String[]> patients =
-                        Database.searchPatient(name, birth);
+                    java.util.List<String[]> patients = Database.searchPatient(name, birth);
 
                     for (String[] patient : patients) {
                         model.addRow(patient);
@@ -144,17 +145,15 @@ public class DashboardScreen extends JFrame {
 
                     if (patients.isEmpty()) {
                         JOptionPane.showMessageDialog(
-                            DashboardScreen.this,
-                            "No patients found."
-                        );
+                                DashboardScreen.this,
+                                "No patients found.");
                     }
 
                 } catch (Exception ex) {
 
                     JOptionPane.showMessageDialog(
-                        DashboardScreen.this,
-                        "Search failed: " + ex.getMessage()
-                    );
+                            DashboardScreen.this,
+                            "Search failed: " + ex.getMessage());
                 }
             }
         });
@@ -201,4 +200,6 @@ public class DashboardScreen extends JFrame {
             panel.add(new JButton("Employee Onboarding"));
             panel.add(new JButton("Employee Offboarding"));
         }
-        return panel;}}
+        return panel;
+    }
+}

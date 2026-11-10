@@ -9,7 +9,7 @@ public class DatabaseConnection {
 
     private static final String DB_USER = "root";
 
-    private static final String DB_PASSWORD = "TreeRoots$5";
+    private static final String DB_PASSWORD = "CHANGE ME";
 
     public static Connection getConnection() throws java.sql.SQLException {
 

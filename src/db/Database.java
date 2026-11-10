@@ -1,6 +1,8 @@
 package db;
+
 import java.sql.*;
 import java.util.ArrayList;
+
 public class Database {
 
     // Connect to MySQL
@@ -8,11 +10,10 @@ public class Database {
 
         String url = "jdbc:mysql://localhost:3306/forceps";
         String user = "root";
-        String password = "";
+        String password = "CHANGE ME";
 
         Connection con = DriverManager.getConnection(
-            url, user, password
-        );
+                url, user, password);
 
         return con;
     }
@@ -24,11 +25,11 @@ public class Database {
         ArrayList<String[]> patients = new ArrayList<String[]>();
 
         String sql = "SELECT patient_id, first_name, last_name, " +
-                     "date_of_birth, phone FROM PATIENT " +
-                     "WHERE last_name = ? AND date_of_birth = ?";
+                "date_of_birth, phone FROM PATIENT " +
+                "WHERE last_name = ? AND date_of_birth = ?";
 
         try (Connection con = connect();
-             PreparedStatement stmt = con.prepareStatement(sql)) {
+                PreparedStatement stmt = con.prepareStatement(sql)) {
 
             stmt.setString(1, name);
             stmt.setDate(2, Date.valueOf(dob));
@@ -42,7 +43,7 @@ public class Database {
                     patient[0] = rs.getString("patient_id");
 
                     patient[1] = rs.getString("first_name") + " " +
-                                 rs.getString("last_name");
+                            rs.getString("last_name");
 
                     patient[2] = rs.getString("date_of_birth");
 
