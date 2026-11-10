@@ -1,5 +1,15 @@
 package views;
 
+// THESE ARE FOR CONNECTION 
+import database.DatabaseConnection;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+
+// THESE ARE FOR PASSWORD HASHING 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+
 import java.util.Arrays;
 
 import javax.swing.BorderFactory;
@@ -26,16 +36,33 @@ public class LoginScreen extends JFrame {
     private static final Font SUBTITLE_FONT = new Font("Arial", Font.PLAIN, 16);
     private static final Color HINT_COLOR = Color.GRAY;
 
+    // TESTING FOR CONNECTION
+    private void testConnection() {
+
+        try (Connection conn = DatabaseConnection.getConnection()) {
+
+            System.out.println("Database connected successfully!");
+
+        } catch (Exception e) {
+
+            System.out.println("Database connection failed!");
+            e.printStackTrace();
+        }
+    }
+
     // Constructor for the LoginScreen class
     public LoginScreen() {
         setTitle("Forceps DBMS - Login");
-        setSize(400,420);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE); 
-        setLocationRelativeTo(null); 
-        setLayout(new BorderLayout()); 
+        setSize(400, 420);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+        setLayout(new BorderLayout());
 
         initializeComponents();
         setupListeners();
+
+        // TEST CONNECTION
+        testConnection();
 
         // Responsible for pulling inital focus away to root pane when window opens
         addWindowListener(new java.awt.event.WindowAdapter() {
@@ -67,17 +94,18 @@ public class LoginScreen extends JFrame {
         JLabel subtitleLabel = new JLabel("Smarter Data for Stronger Lives", JLabel.CENTER);
         subtitleLabel.setFont(SUBTITLE_FONT);
         subtitleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-        subtitleLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 35, 0)); 
+        subtitleLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 35, 0));
         northPanel.add(subtitleLabel);
 
         return northPanel;
     }
 
-    // Creates the form panel containing the user ID field, password field, and login button
+    // Creates the form panel containing the user ID field, password field, and
+    // login button
     private JPanel createFormPanel() {
         JPanel formPanel = new JPanel(new GridLayout(3, 3, 10, 10));
         formPanel.setBorder(BorderFactory.createEmptyBorder(15, 50, 15, 50));
-        
+
         userIdField = new JTextField();
         userIdField.setText("User ID");
         userIdField.setForeground(Color.GRAY);
@@ -157,37 +185,150 @@ public class LoginScreen extends JFrame {
 
         loginButton.addActionListener(e -> {
             try {
-                int userId = Integer.parseInt(userIdField.getText());
+                Long userId = Long.parseLong(userIdField.getText());
                 char[] passwordChars = passwordField.getPassword();
                 handleLogin(userId, passwordChars);
             } catch (NumberFormatException ex) {
-                JOptionPane.showMessageDialog(this, "Please enter a valid User ID.", "Invalid Input", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Please enter a valid User ID.", "Invalid Input",
+                        JOptionPane.ERROR_MESSAGE);
             }
         });
 
-        // Future feature to be implemented, currently a placeholder 
+        // Future feature to be implemented, currently a placeholder
         forgotPasswordButton.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this, "This feature is a work in progress.", "Forgot Password", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(this, "This feature is a work in progress.", "Forgot Password",
+                    JOptionPane.WARNING_MESSAGE);
         });
     }
-    
-    // Controls the logic behind the login process, including authentication and feedback to the user
-    // TO DO: Implement actual authentication logic here ////////////////////////////////////////////////////////////////////////////
-    // Mock authentication for demo purposes
-    private void handleLogin(int userId, char[] passwordChars) {
+
+    // TO HASH THE PASSWORD -> WHEN CREATING NEW USER ACCOUNT DO THIS:
+    // String hashedPassword = hashPassword(password)
+    private String hashPassword(String password) {
         try {
-            if (userId == 12345 && String.valueOf(passwordChars).equals("password")) {
-                JOptionPane.showMessageDialog(this, "Login Successful!", "Success", JOptionPane.INFORMATION_MESSAGE); 
-            } else {
-                JOptionPane.showMessageDialog(this, "Invalid User ID or Password. Please try again.", "Login Failed", JOptionPane.ERROR_MESSAGE);
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hashBytes = md.digest(
+                    password.getBytes(
+                            StandardCharsets.UTF_8));
+
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hashBytes) {
+                sb.append(
+                        String.format("%02x", b));
             }
+            return sb.toString();
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    "Error hashing password", e);
+        }
+    }
+
+    // Controls the logic behind the login process, including authentication and
+    // feedback to the user
+    // actual authentication logic here
+    private void handleLogin(Long userId, char[] passwordChars) {
+        // Convert the entered password from char[] to String
+        String enteredPassword = String.valueOf(passwordChars);
+
+        // Hash the entered password using SHA-256
+        String hashedEnteredPassword = hashPassword(enteredPassword);
+
+        // SQL query to get user account and staff info
+        String sql = """
+                SELECT
+                    ua.account_id,
+                    ua.password_hash,
+                    r.role_name,
+                    s.first_name,
+                    s.last_name
+                FROM User_account ua
+                JOIN Staff s
+                    ON ua.staff_id = s.staff_id
+                JOIN Role r
+                    ON s.role_id = r.role_id
+                WHERE ua.account_id = ?
+                AND ua.account_status = 'ACTIVE'
+                """;
+
+        try (
+                // Connect to database
+                Connection conn = DatabaseConnection.getConnection();
+
+                // Create a prepared statement
+                PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            // Set the account ID parameter
+            stmt.setLong(1, userId);
+
+            // Execute the query
+            ResultSet rs = stmt.executeQuery();
+
+            // Check whether a matching account was found
+            if (rs.next()) {
+                // Get the password hash stored in the database
+                String storedPassword = rs.getString("password_hash");
+                // Get the user's role
+                String role = rs.getString("role_name");
+                // Get first name
+                String firstName = rs.getString("first_name");
+                // Get last name
+                String lastName = rs.getString("last_name");
+                // Compare the stored hash with the hash of the entered password
+                if (storedPassword.equals(hashedEnteredPassword)) {
+
+                    JOptionPane.showMessageDialog(
+                            this,
+                            "Welcome "
+                                    + firstName
+                                    + " "
+                                    + lastName
+                                    + "\nRole: "
+                                    + role,
+                            "Login Successful",
+                            JOptionPane.INFORMATION_MESSAGE);
+                    /*
+                     * FUTURE STEP:
+                     * 
+                     * if(role.equals("Doctor"))
+                     * new DoctorDashboard().setVisible(true);
+                     * 
+                     * if(role.equals("Nurse"))
+                     * new NurseDashboard().setVisible(true);
+                     */
+
+                } else {
+                    // Password was incorrect
+                    JOptionPane.showMessageDialog(
+                            this,
+                            "Invalid User ID or Password.",
+                            "Login Failed",
+                            JOptionPane.ERROR_MESSAGE);
+                }
+            } else {
+                // No active account found with the entered ID
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Invalid User ID or Password.",
+                        "Login Failed",
+                        JOptionPane.ERROR_MESSAGE);
+            }
+        } catch (Exception e) {
+            // Show database error message
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Unable to connect to database.\n"
+                            + e.getMessage(),
+                    "Database Error",
+                    JOptionPane.ERROR_MESSAGE);
+
+            e.printStackTrace();
         } finally {
-            Arrays.fill(passwordChars, '0'); // Wipes password from memory
+            // Clear password characters from memory
+            Arrays.fill(passwordChars, '0');
         }
     }
 
     public static void main(String[] args) {
-       try {
+        try {
             // Set the look and feel to the system's default
             javax.swing.UIManager.setLookAndFeel(javax.swing.UIManager.getSystemLookAndFeelClassName());
         } catch (Exception e) {
