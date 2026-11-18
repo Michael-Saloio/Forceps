@@ -27,7 +27,7 @@ CALL add_doctor(
 CALL add_nurse(
     320006, -- staff id
     11221, -- account id
-    11011019, -- account created by the doctor staf id 
+    11011019, -- account created by the doctor staff id 
 
     'Amy',
     'Rose',

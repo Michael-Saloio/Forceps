@@ -143,7 +143,6 @@ public class LoginScreen extends JFrame {
     }
 
     // Sets up listeners for user interactions with the login screen components
-    // TO DO: Implement "forgot your password" functionality in the future
     private void setupListeners() {
         userIdField.addFocusListener(new java.awt.event.FocusAdapter() {
             @Override
