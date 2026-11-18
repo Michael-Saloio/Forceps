@@ -176,8 +176,110 @@ public class LoginScreen extends JFrame {
     // Mock authentication for demo purposes
     private void handleLogin(int userId, char[] passwordChars) {
         try {
+<<<<<<< Updated upstream
             if (userId == 12345 && String.valueOf(passwordChars).equals("password")) {
                 JOptionPane.showMessageDialog(this, "Login Successful!", "Success", JOptionPane.INFORMATION_MESSAGE); 
+=======
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hashBytes = md.digest(
+                    password.getBytes(
+                            StandardCharsets.UTF_8));
+
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hashBytes) {
+                sb.append(
+                        String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    "Error hashing password", e);
+        }
+    }
+
+    // Controls the logic behind the login process, including authentication and
+    // feedback to the user
+    // actual authentication logic here
+    private void handleLogin(Long userId, char[] passwordChars) {
+        // Convert the entered password from char[] to String
+        String enteredPassword = String.valueOf(passwordChars);
+
+        // Hash the entered password using SHA-256
+        String hashedEnteredPassword = hashPassword(enteredPassword);
+
+        // SQL query to get user account and staff info
+        String sql = """
+                SELECT
+                    ua.account_id,
+                    ua.password_hash,
+                    r.role_name,
+                    s.first_name,
+                    s.last_name
+                FROM User_account ua
+                JOIN Staff s
+                    ON ua.staff_id = s.staff_id
+                JOIN Role r
+                    ON s.role_id = r.role_id
+                WHERE ua.account_id = ?
+                AND ua.account_status = 'ACTIVE'
+                """;
+
+        try (
+                // Connect to database
+                Connection conn = DatabaseConnection.getConnection();
+
+                // Create a prepared statement
+                PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            // Set the account ID parameter
+            stmt.setLong(1, userId);
+
+            // Execute the query
+            ResultSet rs = stmt.executeQuery();
+
+            // Check whether a matching account was found
+            if (rs.next()) {
+                // Get the password hash stored in the database
+                String storedPassword = rs.getString("password_hash");
+                // Get the user's role
+                String role = rs.getString("role_name");
+                // Get first name
+                String firstName = rs.getString("first_name");
+                // Get last name
+                String lastName = rs.getString("last_name");
+                // Compare the stored hash with the hash of the entered password
+                if (storedPassword.equals(hashedEnteredPassword)) {
+
+                    // ONLY HERE FOR NOW, WILL BE REPLACED WITH DOCTOR AND NURSE DASHBOARDS
+                    JOptionPane.showMessageDialog(
+                            this,
+                            "Welcome "
+                                    + firstName
+                                    + " "
+                                    + lastName
+                                    + "\nRole: "
+                                    + role,
+                            "Login Successful",
+                            JOptionPane.INFORMATION_MESSAGE);
+                    /*
+                     * FUTURE STEP:
+                     * 
+                     * if(role.equals("Doctor"))
+                     * new DoctorDashboard().setVisible(true);
+                     * 
+                     * if(role.equals("Nurse"))
+                     * new NurseDashboard().setVisible(true);
+                     */
+
+                } else {
+                    // Password was incorrect
+                    JOptionPane.showMessageDialog(
+                            this,
+                            "Invalid User ID or Password.",
+                            "Login Failed",
+                            JOptionPane.ERROR_MESSAGE);
+                }
+>>>>>>> Stashed changes
             } else {
                 JOptionPane.showMessageDialog(this, "Invalid User ID or Password. Please try again.", "Login Failed", JOptionPane.ERROR_MESSAGE);
             }
