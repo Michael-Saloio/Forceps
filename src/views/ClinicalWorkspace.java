@@ -11,7 +11,6 @@ public class ClinicalWorkspace extends JPanel {
         JTabbedPane tabs = new JTabbedPane();
         JPanel actions = new JPanel(new GridLayout(3, 1, 10, 10));
         if (role.equalsIgnoreCase("Doctor")) {
-            addButton(actions, "Patient Records");
             addButton(actions, "Treatments");
             addButton(actions, "Appointments");
         } else if (role.equalsIgnoreCase("Nurse")) {
