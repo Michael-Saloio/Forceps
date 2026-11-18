@@ -134,6 +134,7 @@ CREATE TABLE Remote_access (
 CREATE TABLE Medical_Record (
     record_id BIGINT AUTO_INCREMENT PRIMARY KEY,
     patient_id BIGINT NOT NULL,
+    visit_id BIGINT NULL,
     clinician_staff_id BIGINT NOT NULL,
     visit_date DATE NOT NULL,
     diagnosis VARCHAR(500) NOT NULL,
@@ -142,6 +143,7 @@ CREATE TABLE Medical_Record (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_medical_record_patient_visit (patient_id, visit_date),
     FOREIGN KEY (patient_id) REFERENCES Patient(patient_id),
+    FOREIGN KEY (visit_id) REFERENCES Visit(visit_id),
     FOREIGN KEY (clinician_staff_id) REFERENCES Staff(staff_id)
 );
 
