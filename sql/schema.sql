@@ -66,7 +66,6 @@ CREATE TABLE User_account (
     FOREIGN KEY (staff_id) REFERENCES Staff(staff_id),
     FOREIGN KEY (created_by_staff_id) REFERENCES Staff(staff_id)
 );
-
 -- create patient table 
 CREATE TABLE Patient (
     patient_id BIGINT PRIMARY KEY,
@@ -80,7 +79,6 @@ CREATE TABLE Patient (
     postal_code VARCHAR(15),
     created_at TIMESTAMP NOT NULL
 );
-
 -- create appt table 
 CREATE TABLE Appointment (
     appt_id BIGINT PRIMARY KEY,
@@ -123,7 +121,7 @@ CREATE TABLE Remote_access (
     code_hash VARCHAR(255) UNIQUE NOT NULL,
     granted_at TIMESTAMP NOT NULL,
     expires_at TIMESTAMP NOT NULL,
-    consumed_at TIMESTAMP NOT NULL,
+    consumed_at TIMESTAMP,
 
     FOREIGN KEY (staff_id) REFERENCES Staff(staff_id),
     FOREIGN KEY (patient_id) REFERENCES Patient(patient_id),

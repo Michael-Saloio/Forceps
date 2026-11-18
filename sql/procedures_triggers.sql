@@ -541,7 +541,7 @@ BEGIN
         param_appt_id,
         NULL,
         param_prospective_first_name,
-        param_prospective_last_name
+        param_prospective_last_name,
         param_prospective_dob,
         param_doctor_id,
         param_booked_by_staff_id,
