@@ -163,6 +163,10 @@ CREATE TABLE Invoice (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_invoice_patient_date (patient_id, invoice_date),
     CONSTRAINT chk_invoice_amount_positive CHECK (amount > 0),
+    CONSTRAINT chk_invoice_payment_status CHECK (
+        (status = 'UNPAID' AND paid_date IS NULL AND paid_by_staff_id IS NULL) OR
+        (status = 'PAID' AND paid_date IS NOT NULL AND paid_by_staff_id IS NOT NULL)
+    ),
     FOREIGN KEY (patient_id) REFERENCES Patient(patient_id),
     FOREIGN KEY (appointment_id) REFERENCES Appointment(appt_id),
     FOREIGN KEY (created_by_staff_id) REFERENCES Staff(staff_id),
