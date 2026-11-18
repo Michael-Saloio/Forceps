@@ -3,7 +3,7 @@ package views;
 import javax.swing.*;
 import java.awt.*;
 
-/** Role-specific tools plus the shared clinical record workflow. */
+/** Role-specific clinical tools. Shared record navigation is provided by the dashboard. */
 public class ClinicalWorkspace extends JPanel {
     public ClinicalWorkspace(String role, String name, long staffId) {
         setLayout(new BorderLayout(8, 8));
@@ -19,7 +19,6 @@ public class ClinicalWorkspace extends JPanel {
             addButton(actions, "Treatments");
         }
         tabs.addTab("Role tools", actions);
-        tabs.addTab("Medical records", new MedicalRecordsPanel(staffId));
         add(tabs, BorderLayout.CENTER);
     }
 

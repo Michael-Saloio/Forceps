@@ -33,13 +33,21 @@ public class DashboardScreen extends JFrame {
         mainPanel.add(profilePage(), "Profile");
         mainPanel.add(searchPage(), "Search");
         mainPanel.add(rolePage(), "Role");
+        if (hasClinicalRecordsAccess()) {
+            mainPanel.add(new MedicalRecordsPanel(staffId), "Medical Records");
+        }
+        if (hasBillingAccess()) {
+            mainPanel.add(new BillingPanel(staffId), "Billing");
+        }
 
-        JPanel menu = new JPanel(new GridLayout(4, 1));
+        JPanel menu = new JPanel(new GridLayout(0, 1));
 
         JButton home = new JButton("Dashboard");
         JButton profile = new JButton("Profile");
         JButton search = new JButton("Search Patient");
         JButton workspace = new JButton("Role Panel");
+        JButton records = new JButton("Medical Records");
+        JButton billing = new JButton("Billing");
 
         home.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
@@ -65,10 +73,15 @@ public class DashboardScreen extends JFrame {
             }
         });
 
+        records.addActionListener(e -> layout.show(mainPanel, "Medical Records"));
+        billing.addActionListener(e -> layout.show(mainPanel, "Billing"));
+
         menu.add(home);
         menu.add(profile);
         menu.add(search);
         menu.add(workspace);
+        if (hasClinicalRecordsAccess()) menu.add(records);
+        if (hasBillingAccess()) menu.add(billing);
 
         add(menu, BorderLayout.WEST);
         add(mainPanel, BorderLayout.CENTER);
@@ -175,13 +188,10 @@ public class DashboardScreen extends JFrame {
         JPanel panel = new JPanel(new BorderLayout(8, 8));
         panel.add(new JLabel(role + " Workspace"), BorderLayout.NORTH);
         if (role.equalsIgnoreCase("Receptionist")) {
-            JTabbedPane tabs = new JTabbedPane();
             JPanel tools = new JPanel(new GridLayout(2, 1, 10, 10));
             tools.add(new JButton("Register Patient"));
             tools.add(new JButton("Appointments"));
-            tabs.addTab("Reception", tools);
-            tabs.addTab("Billing", new BillingPanel(staffId));
-            panel.add(tabs, BorderLayout.CENTER);
+            panel.add(tools, BorderLayout.CENTER);
         } else {
             JPanel tools = new JPanel(new GridLayout(3, 1, 10, 10));
             if (role.equalsIgnoreCase("System Administrator") || role.equalsIgnoreCase("Administrator")) {
@@ -195,6 +205,14 @@ public class DashboardScreen extends JFrame {
             panel.add(tools, BorderLayout.CENTER);
         }
         return panel;
+    }
+
+    private boolean hasClinicalRecordsAccess() {
+        return role.equalsIgnoreCase("Doctor") || role.equalsIgnoreCase("Nurse");
+    }
+
+    private boolean hasBillingAccess() {
+        return role.equalsIgnoreCase("Receptionist");
     }
         private java.util.List<String[]> searchPatient(String name, String birth)
             throws SQLException {
