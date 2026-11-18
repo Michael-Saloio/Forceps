@@ -172,7 +172,7 @@ public class DashboardScreen extends JFrame {
         panel.add(new JLabel(role + " Workspace"));
 
         if (role.equalsIgnoreCase("Doctor") || role.equalsIgnoreCase("Nurse")) {
-        return new ClinicalWorkspace(role, staffName);
+            return new ClinicalWorkspace(role, staffName);
 
         } else if (role.equalsIgnoreCase("Receptionist")) {
 
@@ -193,17 +193,18 @@ public class DashboardScreen extends JFrame {
         }
         return panel;
     }
-        private java.util.List<String[]> searchPatient(String name, String birth)
+
+    private java.util.List<String[]> searchPatient(String name, String birth)
             throws SQLException {
 
         java.util.List<String[]> patients = new java.util.ArrayList<>();
 
         String sql = "SELECT patient_id, first_name, last_name, " +
-                     "date_of_birth, phone FROM PATIENT " +
-                     "WHERE last_name = ? AND date_of_birth = ?";
+                "date_of_birth, phone FROM Patient " +
+                "WHERE last_name = ? AND date_of_birth = ?";
 
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
+                PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setString(1, name);
             stmt.setDate(2, java.sql.Date.valueOf(birth));
@@ -211,10 +212,10 @@ public class DashboardScreen extends JFrame {
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     patients.add(new String[] {
-                        rs.getString("patient_id"),
-                        rs.getString("first_name") + " " + rs.getString("last_name"),
-                        rs.getString("date_of_birth"),
-                        rs.getString("phone")
+                            rs.getString("patient_id"),
+                            rs.getString("first_name") + " " + rs.getString("last_name"),
+                            rs.getString("date_of_birth"),
+                            rs.getString("phone")
                     });
                 }
             }
