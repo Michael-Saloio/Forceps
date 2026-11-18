@@ -13,11 +13,13 @@ public class DashboardScreen extends JFrame {
     CardLayout layout;
     String staffName;
     String role;
+    long staffId;
 
-    public DashboardScreen(String name, String userRole) {
+    public DashboardScreen(String name, String userRole, long staffId) {
 
         staffName = name;
         role = userRole;
+        this.staffId = staffId;
 
         setTitle("Forceps Hospital Dashboard");
         setSize(900, 600);
@@ -164,32 +166,33 @@ public class DashboardScreen extends JFrame {
         return panel;
     }
 
-    // Role workspace
+    // Role workspace. Clinical and billing workflows open their database-backed panels.
     JPanel rolePage() {
-
-        JPanel panel = new JPanel(new GridLayout(4, 1));
-
-        panel.add(new JLabel(role + " Workspace"));
-
         if (role.equalsIgnoreCase("Doctor") || role.equalsIgnoreCase("Nurse")) {
-        return new ClinicalWorkspace(role, staffName);
+            return new ClinicalWorkspace(role, staffName, staffId);
+        }
 
-        } else if (role.equalsIgnoreCase("Receptionist")) {
-
-            panel.add(new JButton("Register Patient"));
-            panel.add(new JButton("Appointments"));
-            panel.add(new JButton("Billing"));
-
-        } else if (role.equalsIgnoreCase("Administrator")) {
-
-            panel.add(new JButton("Manage Accounts"));
-            panel.add(new JButton("Permissions"));
-            panel.add(new JButton("Audit Logs"));
-
-        } else if (role.equalsIgnoreCase("HR")) {
-
-            panel.add(new JButton("Employee Onboarding"));
-            panel.add(new JButton("Employee Offboarding"));
+        JPanel panel = new JPanel(new BorderLayout(8, 8));
+        panel.add(new JLabel(role + " Workspace"), BorderLayout.NORTH);
+        if (role.equalsIgnoreCase("Receptionist")) {
+            JTabbedPane tabs = new JTabbedPane();
+            JPanel tools = new JPanel(new GridLayout(2, 1, 10, 10));
+            tools.add(new JButton("Register Patient"));
+            tools.add(new JButton("Appointments"));
+            tabs.addTab("Reception", tools);
+            tabs.addTab("Billing", new BillingPanel(staffId));
+            panel.add(tabs, BorderLayout.CENTER);
+        } else {
+            JPanel tools = new JPanel(new GridLayout(3, 1, 10, 10));
+            if (role.equalsIgnoreCase("System Administrator") || role.equalsIgnoreCase("Administrator")) {
+                tools.add(new JButton("Manage Accounts"));
+                tools.add(new JButton("Permissions"));
+                tools.add(new JButton("Audit Logs"));
+            } else if (role.equalsIgnoreCase("HR")) {
+                tools.add(new JButton("Employee Onboarding"));
+                tools.add(new JButton("Employee Offboarding"));
+            }
+            panel.add(tools, BorderLayout.CENTER);
         }
         return panel;
     }
