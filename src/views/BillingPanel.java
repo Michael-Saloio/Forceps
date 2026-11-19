@@ -4,16 +4,18 @@ import database.DatabaseConnection;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.awt.print.PrinterException;
 import java.math.BigDecimal;
 import java.sql.*;
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 
-/** Create, update, search, and record payment status for patient invoices. */
+/** Receptionist workflow for searching, creating, correcting, paying, and printing invoices. */
 public class BillingPanel extends JPanel {
     private final long staffId;
     private final JTextField patientId = new JTextField(10);
     private final DefaultTableModel model = new DefaultTableModel(
-            new Object[]{"Invoice", "Patient", "Appointment", "Date", "Description", "Amount", "Status", "Due date", "Paid date"}, 0) {
+            new Object[]{"Invoice", "Patient ID", "Patient name", "Appointment", "Invoice date", "Description", "Amount", "Status", "Due date", "Paid date"}, 0) {
         @Override public boolean isCellEditable(int row, int column) { return false; }
     };
     private final JTable table = new JTable(model);
@@ -21,140 +23,228 @@ public class BillingPanel extends JPanel {
     public BillingPanel(long staffId) {
         this.staffId = staffId;
         setLayout(new BorderLayout(8, 8));
+
         JPanel controls = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        controls.add(new JLabel("Patient ID:")); controls.add(patientId);
+        controls.add(new JLabel("Patient ID (blank = all invoices):"));
+        controls.add(patientId);
         JButton search = new JButton("Search invoices");
         JButton create = new JButton("Create invoice");
-        JButton edit = new JButton("Edit unpaid invoice");
-        JButton paid = new JButton("Mark selected paid");
-        controls.add(search); controls.add(create); controls.add(edit); controls.add(paid);
+        JButton edit = new JButton("Edit unpaid");
+        JButton paid = new JButton("Mark paid");
+        JButton print = new JButton("Print invoice");
+        controls.add(search); controls.add(create); controls.add(edit); controls.add(paid); controls.add(print);
         add(controls, BorderLayout.NORTH);
+
         table.setAutoCreateRowSorter(true);
+        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        table.setFillsViewportHeight(true);
         add(new JScrollPane(table), BorderLayout.CENTER);
+        add(new JLabel("Invoices are linked to the patient and optional appointment; paid invoices are retained for the audit trail."), BorderLayout.SOUTH);
+
         search.addActionListener(e -> loadInvoices());
+        patientId.addActionListener(e -> loadInvoices());
         create.addActionListener(e -> createInvoice());
         edit.addActionListener(e -> editSelectedInvoice());
         paid.addActionListener(e -> markPaid());
+        print.addActionListener(e -> printSelectedInvoice());
     }
 
-    /** Load invoices for one patient, or all invoices when the filter is blank. */
+    /** List invoice details with patient names so reception staff do not work from IDs alone. */
     private void loadInvoices() {
         model.setRowCount(0);
         String id = patientId.getText().trim();
         if (!validId(id, true)) return;
-        String sql = "SELECT invoice_id, patient_id, appointment_id, invoice_date, description, amount, status, due_date, paid_date " +
-                "FROM Invoice WHERE (? = '' OR patient_id = ?) ORDER BY invoice_date DESC, invoice_id DESC";
+        String sql = "SELECT i.invoice_id, i.patient_id, CONCAT(p.first_name, ' ', p.last_name) AS patient_name, " +
+                "i.appointment_id, i.invoice_date, i.description, i.amount, i.status, i.due_date, i.paid_date " +
+                "FROM Invoice i JOIN Patient p ON p.patient_id=i.patient_id " +
+                "WHERE (? = '' OR i.patient_id = ?) ORDER BY i.invoice_date DESC, i.invoice_id DESC";
         try (Connection c = DatabaseConnection.getConnection(); PreparedStatement q = c.prepareStatement(sql)) {
             q.setString(1, id);
             if (id.isEmpty()) q.setNull(2, Types.BIGINT); else q.setLong(2, Long.parseLong(id));
             try (ResultSet r = q.executeQuery()) {
-                while (r.next()) model.addRow(new Object[]{r.getLong("invoice_id"), r.getLong("patient_id"),
-                        r.getObject("appointment_id"), r.getDate("invoice_date"), r.getString("description"),
-                        r.getBigDecimal("amount"), r.getString("status"), r.getDate("due_date"), r.getDate("paid_date")});
+                while (r.next()) {
+                    model.addRow(new Object[]{r.getLong("invoice_id"), r.getLong("patient_id"), r.getString("patient_name"),
+                            r.getObject("appointment_id"), r.getDate("invoice_date"), r.getString("description"),
+                            r.getBigDecimal("amount"), r.getString("status"), r.getDate("due_date"), r.getDate("paid_date")});
+                }
             }
-        } catch (SQLException ex) { showError(ex); }
+            if (model.getRowCount() == 0) JOptionPane.showMessageDialog(this, "No invoices found.");
+        } catch (NumberFormatException ex) {
+            showMessage("Enter a positive whole-number patient ID.");
+        } catch (SQLException ex) {
+            showError(ex);
+        }
     }
 
-    /** Create an invoice and optionally link it to an appointment for the same patient. */
+    /** Record an invoice against a verified patient and, when provided, their own appointment. */
     private void createInvoice() {
         JTextField patient = new JTextField(patientId.getText().trim(), 16);
         JTextField appointment = new JTextField(12);
-        JTextField description = new JTextField(24);
+        JTextField description = new JTextField(26);
         JTextField amount = new JTextField(12);
         JTextField dueDate = new JTextField(LocalDate.now().plusDays(30).toString(), 16);
         JPanel form = new JPanel(new GridLayout(0, 2, 5, 5));
         form.add(new JLabel("Patient ID *")); form.add(patient);
         form.add(new JLabel("Appointment ID (optional)")); form.add(appointment);
         form.add(new JLabel("Description *")); form.add(description);
-        form.add(new JLabel("Amount *")); form.add(amount);
+        form.add(new JLabel("Amount * (up to 2 decimal places)")); form.add(amount);
         form.add(new JLabel("Due date (YYYY-MM-DD) *")); form.add(dueDate);
         if (JOptionPane.showConfirmDialog(this, form, "New invoice", JOptionPane.OK_CANCEL_OPTION) != JOptionPane.OK_OPTION) return;
+
         String patientKey = patient.getText().trim();
         String appointmentKey = appointment.getText().trim();
         if (!validId(patientKey, false) || !validId(appointmentKey, true)) return;
-        if (description.getText().trim().isEmpty()) { JOptionPane.showMessageDialog(this, "Invoice description is required."); return; }
+        if (description.getText().trim().isEmpty()) { showMessage("Invoice description is required."); return; }
+
         try {
             BigDecimal value = validAmount(amount.getText().trim());
-            Date due = Date.valueOf(dueDate.getText().trim());
-            if (!appointmentKey.isEmpty() && !appointmentBelongsToPatient(Long.parseLong(appointmentKey), Long.parseLong(patientKey))) {
-                JOptionPane.showMessageDialog(this, "That appointment does not belong to this patient.");
-                return;
-            }
-            String sql = "INSERT INTO Invoice(patient_id, appointment_id, created_by_staff_id, invoice_date, description, amount, status, due_date) " +
-                    "VALUES(?,?,?,CURRENT_DATE,?,?, 'UNPAID',?)";
-            try (Connection c = DatabaseConnection.getConnection(); PreparedStatement q = c.prepareStatement(sql)) {
-                q.setLong(1, Long.parseLong(patientKey));
-                if (appointmentKey.isEmpty()) q.setNull(2, Types.BIGINT); else q.setLong(2, Long.parseLong(appointmentKey));
-                q.setLong(3, staffId); q.setString(4, description.getText().trim()); q.setBigDecimal(5, value); q.setDate(6, due);
-                q.executeUpdate();
+            Date due = parseDate(dueDate.getText().trim(), "due date");
+            long patientValue = Long.parseLong(patientKey);
+            Long appointmentValue = appointmentKey.isEmpty() ? null : Long.parseLong(appointmentKey);
+
+            try (Connection c = DatabaseConnection.getConnection()) {
+                if (!patientExists(c, patientValue)) { showMessage("Patient " + patientKey + " was not found."); return; }
+                if (appointmentValue != null && !appointmentBelongsToPatient(c, appointmentValue, patientValue)) {
+                    showMessage("That appointment does not belong to the selected patient."); return;
+                }
+                String sql = "INSERT INTO Invoice(patient_id, appointment_id, created_by_staff_id, invoice_date, description, amount, status, due_date) " +
+                        "VALUES(?,?,?,CURRENT_DATE,?,?, 'UNPAID',?)";
+                try (PreparedStatement q = c.prepareStatement(sql)) {
+                    q.setLong(1, patientValue);
+                    if (appointmentValue == null) q.setNull(2, Types.BIGINT); else q.setLong(2, appointmentValue);
+                    q.setLong(3, staffId);
+                    q.setString(4, description.getText().trim());
+                    q.setBigDecimal(5, value);
+                    q.setDate(6, due);
+                    q.executeUpdate();
+                }
             }
             patientId.setText(patientKey);
             loadInvoices();
-            JOptionPane.showMessageDialog(this, "Invoice created.");
+            showMessage("Invoice created and saved.");
         } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(this, "Enter a positive amount with up to two decimal places.");
+            showMessage("Enter a positive amount with no more than two decimal places.");
         } catch (IllegalArgumentException ex) {
-            JOptionPane.showMessageDialog(this, "Enter a valid due date in YYYY-MM-DD format.");
-        } catch (SQLException ex) { showError(ex); }
+            showMessage(ex.getMessage());
+        } catch (SQLException ex) {
+            showError(ex);
+        }
     }
 
-    /** Allow staff to correct an unpaid invoice; paid invoices stay fixed. */
+    /** Only unpaid invoices can be edited; patient and creator remain immutable. */
     private void editSelectedInvoice() {
         int row = selectedModelRow();
-        if (row < 0) { JOptionPane.showMessageDialog(this, "Select an invoice first."); return; }
-        String status = String.valueOf(model.getValueAt(row, 6));
-        if (!"UNPAID".equalsIgnoreCase(status)) { JOptionPane.showMessageDialog(this, "Only unpaid invoices can be edited."); return; }
+        if (row < 0) { showMessage("Select an invoice first."); return; }
+        String status = String.valueOf(model.getValueAt(row, 7));
+        if (!"UNPAID".equalsIgnoreCase(status)) { showMessage("Only unpaid invoices can be edited."); return; }
+
         long invoiceId = ((Number) model.getValueAt(row, 0)).longValue();
         long patientKey = ((Number) model.getValueAt(row, 1)).longValue();
-        JTextField appointment = new JTextField(textAt(row, 2), 12);
-        JTextField description = new JTextField(textAt(row, 4), 24);
-        JTextField amount = new JTextField(textAt(row, 5), 12);
-        JTextField dueDate = new JTextField(textAt(row, 7), 16);
+        JTextField appointment = new JTextField(textAt(row, 3), 12);
+        JTextField description = new JTextField(textAt(row, 5), 26);
+        JTextField amount = new JTextField(textAt(row, 6), 12);
+        JTextField dueDate = new JTextField(textAt(row, 8), 16);
         JPanel form = new JPanel(new GridLayout(0, 2, 5, 5));
         form.add(new JLabel("Appointment ID (optional)")); form.add(appointment);
         form.add(new JLabel("Description *")); form.add(description);
-        form.add(new JLabel("Amount *")); form.add(amount);
+        form.add(new JLabel("Amount * (up to 2 decimal places)")); form.add(amount);
         form.add(new JLabel("Due date (YYYY-MM-DD) *")); form.add(dueDate);
-        if (JOptionPane.showConfirmDialog(this, form, "Edit invoice", JOptionPane.OK_CANCEL_OPTION) != JOptionPane.OK_OPTION) return;
+        if (JOptionPane.showConfirmDialog(this, form, "Edit unpaid invoice", JOptionPane.OK_CANCEL_OPTION) != JOptionPane.OK_OPTION) return;
+
         String appointmentKey = appointment.getText().trim();
         if (!validId(appointmentKey, true)) return;
-        if (description.getText().trim().isEmpty()) { JOptionPane.showMessageDialog(this, "Invoice description is required."); return; }
+        if (description.getText().trim().isEmpty()) { showMessage("Invoice description is required."); return; }
         try {
             BigDecimal value = validAmount(amount.getText().trim());
-            Date due = Date.valueOf(dueDate.getText().trim());
-            if (!appointmentKey.isEmpty() && !appointmentBelongsToPatient(Long.parseLong(appointmentKey), patientKey)) {
-                JOptionPane.showMessageDialog(this, "That appointment does not belong to this patient.");
-                return;
-            }
-            String sql = "UPDATE Invoice SET appointment_id=?, description=?, amount=?, due_date=? WHERE invoice_id=? AND status='UNPAID'";
-            try (Connection c = DatabaseConnection.getConnection(); PreparedStatement q = c.prepareStatement(sql)) {
-                if (appointmentKey.isEmpty()) q.setNull(1, Types.BIGINT); else q.setLong(1, Long.parseLong(appointmentKey));
-                q.setString(2, description.getText().trim()); q.setBigDecimal(3, value); q.setDate(4, due); q.setLong(5, invoiceId);
-                if (q.executeUpdate() == 0) { JOptionPane.showMessageDialog(this, "Invoice is paid or no longer exists."); return; }
+            Date due = parseDate(dueDate.getText().trim(), "due date");
+            Long appointmentValue = appointmentKey.isEmpty() ? null : Long.parseLong(appointmentKey);
+            try (Connection c = DatabaseConnection.getConnection()) {
+                if (appointmentValue != null && !appointmentBelongsToPatient(c, appointmentValue, patientKey)) {
+                    showMessage("That appointment does not belong to the invoice's patient."); return;
+                }
+                String sql = "UPDATE Invoice SET appointment_id=?, description=?, amount=?, due_date=? WHERE invoice_id=? AND status='UNPAID'";
+                try (PreparedStatement q = c.prepareStatement(sql)) {
+                    if (appointmentValue == null) q.setNull(1, Types.BIGINT); else q.setLong(1, appointmentValue);
+                    q.setString(2, description.getText().trim()); q.setBigDecimal(3, value);
+                    q.setDate(4, due); q.setLong(5, invoiceId);
+                    if (q.executeUpdate() == 0) { showMessage("Invoice is paid or no longer exists."); return; }
+                }
             }
             loadInvoices();
-            JOptionPane.showMessageDialog(this, "Invoice updated.");
+            showMessage("Invoice updated.");
         } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(this, "Enter a positive amount with up to two decimal places.");
+            showMessage("Enter a positive amount with no more than two decimal places.");
         } catch (IllegalArgumentException ex) {
-            JOptionPane.showMessageDialog(this, "Enter a valid due date in YYYY-MM-DD format.");
-        } catch (SQLException ex) { showError(ex); }
+            showMessage(ex.getMessage());
+        } catch (SQLException ex) {
+            showError(ex);
+        }
     }
 
-    /** Mark the selected invoice paid and record which staff member handled it. */
+    /** Mark payment once and record the receptionist and date for the database audit trail. */
     private void markPaid() {
         int row = selectedModelRow();
-        if (row < 0) { JOptionPane.showMessageDialog(this, "Select an invoice first."); return; }
+        if (row < 0) { showMessage("Select an invoice first."); return; }
+        if (!"UNPAID".equalsIgnoreCase(String.valueOf(model.getValueAt(row, 7)))) {
+            showMessage("This invoice is already paid."); return;
+        }
+        int confirm = JOptionPane.showConfirmDialog(this, "Mark invoice " + model.getValueAt(row, 0) + " as paid?",
+                "Confirm payment", JOptionPane.OK_CANCEL_OPTION);
+        if (confirm != JOptionPane.OK_OPTION) return;
+
         long invoiceId = ((Number) model.getValueAt(row, 0)).longValue();
         String sql = "UPDATE Invoice SET status='PAID', paid_date=CURRENT_DATE, paid_by_staff_id=? WHERE invoice_id=? AND status='UNPAID'";
         try (Connection c = DatabaseConnection.getConnection(); PreparedStatement q = c.prepareStatement(sql)) {
             q.setLong(1, staffId); q.setLong(2, invoiceId);
-            if (q.executeUpdate() == 0) JOptionPane.showMessageDialog(this, "Invoice is already paid or no longer exists.");
+            if (q.executeUpdate() == 0) { showMessage("Invoice is already paid or no longer exists."); return; }
             loadInvoices();
-        } catch (SQLException ex) { showError(ex); }
+            showMessage("Payment recorded.");
+        } catch (SQLException ex) {
+            showError(ex);
+        }
     }
 
-    /** Return selected row in model coordinates so sorting cannot target another invoice. */
+    /** Format the selected saved invoice and open the native print dialog (including Save as PDF). */
+    private void printSelectedInvoice() {
+        int row = selectedModelRow();
+        if (row < 0) { showMessage("Select an invoice to print."); return; }
+        StringBuilder text = new StringBuilder();
+        text.append("FORCEPS HOSPITAL\nINVOICE\n\n");
+        text.append("Invoice: ").append(model.getValueAt(row, 0)).append('\n');
+        text.append("Patient: ").append(model.getValueAt(row, 2)).append(" (ID ").append(model.getValueAt(row, 1)).append(")\n");
+        text.append("Appointment: ").append(valueOrNone(model.getValueAt(row, 3))).append('\n');
+        text.append("Invoice date: ").append(valueOrNone(model.getValueAt(row, 4))).append('\n');
+        text.append("Due date: ").append(valueOrNone(model.getValueAt(row, 8))).append("\n\n");
+        text.append("Description: ").append(model.getValueAt(row, 5)).append('\n');
+        text.append("Amount: ").append(String.format(java.util.Locale.ROOT, "%.2f", ((Number) model.getValueAt(row, 6)).doubleValue())).append('\n');
+        text.append("Status: ").append(model.getValueAt(row, 7)).append('\n');
+        text.append("Paid date: ").append(valueOrNone(model.getValueAt(row, 9))).append('\n');
+        text.append("\nThis invoice is a project demonstration record.");
+
+        JTextArea printable = new JTextArea(text.toString());
+        printable.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        try {
+            if (!printable.print(null, null, true, null, null, true)) showMessage("Printing was cancelled.");
+        } catch (PrinterException ex) {
+            showMessage("Unable to print invoice: " + ex.getMessage());
+        }
+    }
+
+    private boolean patientExists(Connection c, long id) throws SQLException {
+        try (PreparedStatement q = c.prepareStatement("SELECT 1 FROM Patient WHERE patient_id=?")) {
+            q.setLong(1, id);
+            try (ResultSet r = q.executeQuery()) { return r.next(); }
+        }
+    }
+
+    private boolean appointmentBelongsToPatient(Connection c, long appointmentId, long patientId) throws SQLException {
+        try (PreparedStatement q = c.prepareStatement("SELECT 1 FROM Appointment WHERE appt_id=? AND patient_id=?")) {
+            q.setLong(1, appointmentId); q.setLong(2, patientId);
+            try (ResultSet r = q.executeQuery()) { return r.next(); }
+        }
+    }
+
+    /** Return selected row in model coordinates so sorting cannot update or print another invoice. */
     private int selectedModelRow() {
         int row = table.getSelectedRow();
         return row < 0 ? -1 : table.convertRowIndexToModel(row);
@@ -165,29 +255,33 @@ public class BillingPanel extends JPanel {
         return value == null ? "" : value.toString();
     }
 
+    private String valueOrNone(Object value) {
+        return value == null || value.toString().trim().isEmpty() ? "-" : value.toString();
+    }
+
     private BigDecimal validAmount(String input) {
         BigDecimal value = new BigDecimal(input);
         if (value.signum() <= 0 || value.scale() > 2) throw new NumberFormatException();
         return value;
     }
 
-    /** Ensure any supplied appointment belongs to the invoice's patient. */
-    private boolean appointmentBelongsToPatient(long appointmentId, long patientId) throws SQLException {
-        String sql = "SELECT 1 FROM Appointment WHERE appt_id=? AND patient_id=?";
-        try (Connection c = DatabaseConnection.getConnection(); PreparedStatement q = c.prepareStatement(sql)) {
-            q.setLong(1, appointmentId); q.setLong(2, patientId);
-            try (ResultSet r = q.executeQuery()) { return r.next(); }
-        }
+    private Date parseDate(String input, String label) {
+        try { return Date.valueOf(LocalDate.parse(input)); }
+        catch (DateTimeParseException ex) { throw new IllegalArgumentException("Enter a valid " + label + " in YYYY-MM-DD format."); }
     }
 
     private boolean validId(String value, boolean allowEmpty) {
         if (allowEmpty && value.isEmpty()) return true;
         try { if (Long.parseLong(value) > 0) return true; } catch (NumberFormatException ignored) { }
-        JOptionPane.showMessageDialog(this, "Enter a positive whole-number ID.");
+        showMessage("Enter a positive whole-number ID.");
         return false;
     }
 
+    private void showMessage(String message) {
+        JOptionPane.showMessageDialog(this, message);
+    }
+
     private void showError(SQLException ex) {
-        JOptionPane.showMessageDialog(this, "Database operation failed: " + ex.getMessage(), "Database error", JOptionPane.ERROR_MESSAGE);
+        JOptionPane.showMessageDialog(this, "Billing operation failed: " + ex.getMessage(), "Database error", JOptionPane.ERROR_MESSAGE);
     }
 }

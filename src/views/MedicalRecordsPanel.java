@@ -5,14 +5,13 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.sql.*;
-import java.time.LocalDate;
 
-/** Search and manage patient visit records for clinical staff. */
+/** Search, review, create, and update clinical records for an identified patient. */
 public class MedicalRecordsPanel extends JPanel {
     private final long clinicianStaffId;
     private final JTextField patientId = new JTextField(10);
     private final DefaultTableModel model = new DefaultTableModel(
-            new Object[]{"Record", "Patient", "Visit", "Visit date", "Clinician", "Diagnosis", "Treatment", "Notes"}, 0) {
+            new Object[]{"Record", "Patient", "Visit / check-in", "Clinician", "Diagnosis", "Treatment", "Notes"}, 0) {
         @Override public boolean isCellEditable(int row, int column) { return false; }
     };
     private final JTable table = new JTable(model);
@@ -20,8 +19,9 @@ public class MedicalRecordsPanel extends JPanel {
     public MedicalRecordsPanel(long clinicianStaffId) {
         this.clinicianStaffId = clinicianStaffId;
         setLayout(new BorderLayout(8, 8));
+
         JPanel controls = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        controls.add(new JLabel("Patient ID:"));
+        controls.add(new JLabel("Patient ID / scanned barcode:"));
         controls.add(patientId);
         JButton search = new JButton("Search records");
         JButton add = new JButton("Add record");
@@ -30,117 +30,155 @@ public class MedicalRecordsPanel extends JPanel {
         controls.add(add);
         controls.add(edit);
         add(controls, BorderLayout.NORTH);
+
         table.setAutoCreateRowSorter(true);
+        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        table.setFillsViewportHeight(true);
         add(new JScrollPane(table), BorderLayout.CENTER);
+
+        JLabel note = new JLabel("Identify the patient by ID or scan the barcode; visit/check-in timestamps come from the linked visit.");
+        add(note, BorderLayout.SOUTH);
+
         search.addActionListener(e -> loadRecords());
         add.addActionListener(e -> createRecord());
         edit.addActionListener(e -> editSelectedRecord());
+        patientId.addActionListener(e -> loadRecords());
     }
 
-    /** Load records for one patient, or all records when the filter is blank. */
+    /** A patient ID is required so searches never expose every patient's history. */
     private void loadRecords() {
         model.setRowCount(0);
         String id = patientId.getText().trim();
-        if (!validId(id, true)) return;
-        String sql = "SELECT mr.record_id, mr.patient_id, mr.visit_id, mr.visit_date, " +
+        if (!validId(id, false)) return;
+
+        String sql = "SELECT mr.record_id, p.patient_id, p.first_name, p.last_name, " +
+                "COALESCE(DATE_FORMAT(v.check_in_at, '%Y-%m-%d %H:%i'), DATE_FORMAT(mr.visit_date, '%Y-%m-%d')) AS visit_time, " +
                 "CONCAT(s.first_name, ' ', s.last_name) AS clinician, mr.diagnosis, mr.treatment, mr.notes " +
-                "FROM Medical_Record mr JOIN Staff s ON s.staff_id = mr.clinician_staff_id " +
-                "WHERE (? = '' OR mr.patient_id = ?) ORDER BY mr.visit_date DESC, mr.record_id DESC";
+                "FROM Medical_Record mr " +
+                "JOIN Patient p ON p.patient_id = mr.patient_id " +
+                "JOIN Staff s ON s.staff_id = mr.clinician_staff_id " +
+                "LEFT JOIN Visit v ON v.visit_id = mr.visit_id " +
+                "WHERE mr.patient_id = ? ORDER BY COALESCE(v.check_in_at, mr.visit_date) DESC, mr.record_id DESC";
         try (Connection c = DatabaseConnection.getConnection(); PreparedStatement q = c.prepareStatement(sql)) {
-            q.setString(1, id);
-            if (id.isEmpty()) q.setNull(2, Types.BIGINT); else q.setLong(2, Long.parseLong(id));
+            q.setLong(1, Long.parseLong(id));
             try (ResultSet r = q.executeQuery()) {
-                while (r.next()) model.addRow(new Object[]{r.getLong("record_id"), r.getLong("patient_id"),
-                        r.getObject("visit_id"), r.getDate("visit_date"), r.getString("clinician"),
-                        r.getString("diagnosis"), r.getString("treatment"), r.getString("notes")});
+                while (r.next()) {
+                    model.addRow(new Object[]{r.getLong("record_id"),
+                            r.getLong("patient_id") + " - " + r.getString("first_name") + " " + r.getString("last_name"),
+                            r.getString("visit_time"), r.getString("clinician"), r.getString("diagnosis"),
+                            r.getString("treatment"), r.getString("notes")});
+                }
             }
-        } catch (SQLException ex) { showError(ex); }
+            if (model.getRowCount() == 0) JOptionPane.showMessageDialog(this, "No medical records found for patient " + id + ".");
+        } catch (NumberFormatException ex) {
+            showMessage("Enter a positive whole-number patient ID (or scan a barcode containing that ID).");
+        } catch (SQLException ex) {
+            showError(ex);
+        }
     }
 
-    /** Create a clinical record and optionally attach it to the patient's visit. */
+    /** New records can link to a checked-in visit; its timestamp is read from Visit and cannot be edited here. */
     private void createRecord() {
-        JTextField patient = new JTextField(patientId.getText().trim(), 16);
+        JTextField patient = new JTextField(patientId.getText().trim(), 18);
         JTextField visit = new JTextField(12);
-        JTextField visitDate = new JTextField(LocalDate.now().toString(), 16);
         JTextField diagnosis = new JTextField(32);
-        JTextField treatment = new JTextField(32);
-        JTextArea notes = new JTextArea(5, 32);
+        JTextArea treatment = new JTextArea(3, 32);
+        JTextArea notes = new JTextArea(4, 32);
         JPanel form = new JPanel(new GridLayout(0, 2, 5, 5));
-        form.add(new JLabel("Patient ID *")); form.add(patient);
-        form.add(new JLabel("Visit ID (optional)")); form.add(visit);
-        form.add(new JLabel("Visit date (YYYY-MM-DD) *")); form.add(visitDate);
+        form.add(new JLabel("Patient ID / barcode *")); form.add(patient);
+        form.add(new JLabel("Checked-in visit ID (optional)")); form.add(visit);
         form.add(new JLabel("Diagnosis *")); form.add(diagnosis);
-        form.add(new JLabel("Treatment")); form.add(treatment);
-        form.add(new JLabel("Notes")); form.add(new JScrollPane(notes));
+        form.add(new JLabel("Treatment")); form.add(new JScrollPane(treatment));
+        form.add(new JLabel("Additional notes")); form.add(new JScrollPane(notes));
+        form.add(new JLabel("Visit date/time")); form.add(new JLabel("Automatic from visit; otherwise today"));
+
         if (JOptionPane.showConfirmDialog(this, form, "New medical record", JOptionPane.OK_CANCEL_OPTION) != JOptionPane.OK_OPTION) return;
         String patientKey = patient.getText().trim();
         String visitKey = visit.getText().trim();
         if (!validId(patientKey, false) || !validId(visitKey, true)) return;
-        if (diagnosis.getText().trim().isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Diagnosis is required.");
-            return;
-        }
-        try {
-            Date date = Date.valueOf(visitDate.getText().trim());
-            if (!visitKey.isEmpty() && !visitBelongsToPatient(Long.parseLong(visitKey), Long.parseLong(patientKey))) {
-                JOptionPane.showMessageDialog(this, "That visit does not belong to this patient.");
+        if (diagnosis.getText().trim().isEmpty()) { showMessage("Diagnosis is required."); return; }
+
+        try (Connection c = DatabaseConnection.getConnection()) {
+            long patientValue = Long.parseLong(patientKey);
+            if (!patientExists(c, patientValue)) { showMessage("Patient " + patientKey + " was not found."); return; }
+            Long visitValue = visitKey.isEmpty() ? null : Long.parseLong(visitKey);
+            Date visitDate = visitValue == null ? new Date(System.currentTimeMillis()) : checkedInVisitDate(c, visitValue, patientValue);
+            if (visitValue != null && visitDate == null) {
+                showMessage("The visit was not found for this patient. Use a checked-in visit ID or leave it blank.");
                 return;
             }
+
             String sql = "INSERT INTO Medical_Record(patient_id, visit_id, clinician_staff_id, visit_date, diagnosis, treatment, notes) VALUES(?,?,?,?,?,?,?)";
-            try (Connection c = DatabaseConnection.getConnection(); PreparedStatement q = c.prepareStatement(sql)) {
-                q.setLong(1, Long.parseLong(patientKey));
-                if (visitKey.isEmpty()) q.setNull(2, Types.BIGINT); else q.setLong(2, Long.parseLong(visitKey));
-                q.setLong(3, clinicianStaffId); q.setDate(4, date);
-                q.setString(5, diagnosis.getText().trim()); q.setString(6, treatment.getText().trim());
-                q.setString(7, notes.getText().trim()); q.executeUpdate();
+            try (PreparedStatement q = c.prepareStatement(sql)) {
+                q.setLong(1, patientValue);
+                if (visitValue == null) q.setNull(2, Types.BIGINT); else q.setLong(2, visitValue);
+                q.setLong(3, clinicianStaffId);
+                q.setDate(4, visitDate);
+                q.setString(5, diagnosis.getText().trim());
+                q.setString(6, emptyToNull(treatment.getText()));
+                q.setString(7, emptyToNull(notes.getText()));
+                q.executeUpdate();
             }
             patientId.setText(patientKey);
             loadRecords();
-            JOptionPane.showMessageDialog(this, "Medical record saved.");
-        } catch (IllegalArgumentException ex) {
-            JOptionPane.showMessageDialog(this, "Enter a valid visit date in YYYY-MM-DD format.");
-        } catch (SQLException ex) { showError(ex); }
+            showMessage("Medical record saved.");
+        } catch (NumberFormatException ex) {
+            showMessage("Enter positive whole-number patient and visit IDs.");
+        } catch (SQLException ex) {
+            showError(ex);
+        }
     }
 
-    /** Update the selected record's clinical details without changing its patient or author. */
+    /** Clinical text can be corrected, but patient, clinician, visit link, and visit time remain fixed. */
     private void editSelectedRecord() {
-        int row = table.getSelectedRow();
-        if (row < 0) { JOptionPane.showMessageDialog(this, "Select a record first."); return; }
-        int modelRow = table.convertRowIndexToModel(row);
-        long recordId = ((Number) model.getValueAt(modelRow, 0)).longValue();
-        JTextField visitDate = new JTextField(cellText(modelRow, 3), 16);
-        JTextField diagnosis = new JTextField(cellText(modelRow, 5), 32);
-        JTextField treatment = new JTextField(cellText(modelRow, 6), 32);
-        JTextArea notes = new JTextArea(cellText(modelRow, 7), 5, 32);
+        int row = selectedModelRow();
+        if (row < 0) { showMessage("Select a record first."); return; }
+        long recordId = ((Number) model.getValueAt(row, 0)).longValue();
+        JTextField diagnosis = new JTextField(cellText(row, 4), 32);
+        JTextArea treatment = new JTextArea(cellText(row, 5), 3, 32);
+        JTextArea notes = new JTextArea(cellText(row, 6), 4, 32);
         JPanel form = new JPanel(new GridLayout(0, 2, 5, 5));
-        form.add(new JLabel("Visit date (YYYY-MM-DD) *")); form.add(visitDate);
         form.add(new JLabel("Diagnosis *")); form.add(diagnosis);
-        form.add(new JLabel("Treatment")); form.add(treatment);
-        form.add(new JLabel("Notes")); form.add(new JScrollPane(notes));
+        form.add(new JLabel("Treatment")); form.add(new JScrollPane(treatment));
+        form.add(new JLabel("Additional notes")); form.add(new JScrollPane(notes));
+        form.add(new JLabel("Patient / visit / timestamp")); form.add(new JLabel("Read-only"));
         if (JOptionPane.showConfirmDialog(this, form, "Edit medical record", JOptionPane.OK_CANCEL_OPTION) != JOptionPane.OK_OPTION) return;
-        if (diagnosis.getText().trim().isEmpty()) { JOptionPane.showMessageDialog(this, "Diagnosis is required."); return; }
-        try {
-            Date date = Date.valueOf(visitDate.getText().trim());
-            String sql = "UPDATE Medical_Record SET visit_date=?, diagnosis=?, treatment=?, notes=? WHERE record_id=?";
-            try (Connection c = DatabaseConnection.getConnection(); PreparedStatement q = c.prepareStatement(sql)) {
-                q.setDate(1, date); q.setString(2, diagnosis.getText().trim());
-                q.setString(3, treatment.getText().trim()); q.setString(4, notes.getText().trim());
-                q.setLong(5, recordId); q.executeUpdate();
-            }
+        if (diagnosis.getText().trim().isEmpty()) { showMessage("Diagnosis is required."); return; }
+
+        String sql = "UPDATE Medical_Record SET diagnosis=?, treatment=?, notes=? WHERE record_id=?";
+        try (Connection c = DatabaseConnection.getConnection(); PreparedStatement q = c.prepareStatement(sql)) {
+            q.setString(1, diagnosis.getText().trim());
+            q.setString(2, emptyToNull(treatment.getText()));
+            q.setString(3, emptyToNull(notes.getText()));
+            q.setLong(4, recordId);
+            if (q.executeUpdate() == 0) { showMessage("This record no longer exists. Refresh and try again."); return; }
             loadRecords();
-            JOptionPane.showMessageDialog(this, "Medical record updated.");
-        } catch (IllegalArgumentException ex) {
-            JOptionPane.showMessageDialog(this, "Enter a valid visit date in YYYY-MM-DD format.");
-        } catch (SQLException ex) { showError(ex); }
+            showMessage("Medical record updated.");
+        } catch (SQLException ex) {
+            showError(ex);
+        }
     }
 
-    /** Ensure an optional visit belongs to the patient selected in the form. */
-    private boolean visitBelongsToPatient(long visitId, long patientId) throws SQLException {
-        String sql = "SELECT 1 FROM Visit v JOIN Appointment a ON a.appt_id=v.appt_id WHERE v.visit_id=? AND a.patient_id=?";
-        try (Connection c = DatabaseConnection.getConnection(); PreparedStatement q = c.prepareStatement(sql)) {
-            q.setLong(1, visitId); q.setLong(2, patientId);
+    private boolean patientExists(Connection c, long id) throws SQLException {
+        try (PreparedStatement q = c.prepareStatement("SELECT 1 FROM Patient WHERE patient_id=?")) {
+            q.setLong(1, id);
             try (ResultSet r = q.executeQuery()) { return r.next(); }
         }
+    }
+
+    /** Return the stored calendar date only for a visit belonging to this patient. */
+    private Date checkedInVisitDate(Connection c, long visitId, long patientId) throws SQLException {
+        String sql = "SELECT DATE(v.check_in_at) AS visit_date FROM Visit v " +
+                "JOIN Appointment a ON a.appt_id=v.appt_id WHERE v.visit_id=? AND a.patient_id=?";
+        try (PreparedStatement q = c.prepareStatement(sql)) {
+            q.setLong(1, visitId); q.setLong(2, patientId);
+            try (ResultSet r = q.executeQuery()) { return r.next() ? r.getDate("visit_date") : null; }
+        }
+    }
+
+    private int selectedModelRow() {
+        int row = table.getSelectedRow();
+        return row < 0 ? -1 : table.convertRowIndexToModel(row);
     }
 
     private String cellText(int row, int column) {
@@ -151,11 +189,20 @@ public class MedicalRecordsPanel extends JPanel {
     private boolean validId(String value, boolean allowEmpty) {
         if (allowEmpty && value.isEmpty()) return true;
         try { if (Long.parseLong(value) > 0) return true; } catch (NumberFormatException ignored) { }
-        JOptionPane.showMessageDialog(this, "Enter a positive whole-number ID.");
+        showMessage("Enter a positive whole-number ID.");
         return false;
     }
 
+    private String emptyToNull(String value) {
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private void showMessage(String message) {
+        JOptionPane.showMessageDialog(this, message);
+    }
+
     private void showError(SQLException ex) {
-        JOptionPane.showMessageDialog(this, "Database operation failed: " + ex.getMessage(), "Database error", JOptionPane.ERROR_MESSAGE);
+        JOptionPane.showMessageDialog(this, "Medical records operation failed: " + ex.getMessage(), "Database error", JOptionPane.ERROR_MESSAGE);
     }
 }
