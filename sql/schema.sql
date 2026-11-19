@@ -29,6 +29,7 @@ CREATE TABLE Staff (
     department VARCHAR(100),
     hire_date DATE NOT NULL,
     termination_date DATE NULL,
+    termination_reason VARCHAR(500) NULL,
 
     FOREIGN KEY (role_id) REFERENCES Role(role_id)
 
@@ -104,9 +105,8 @@ CREATE TABLE Visit(
     appt_id BIGINT UNIQUE NOT NULL, 
     checked_in_by_staff_id BIGINT NOT NULL,
     check_in_at TIMESTAMP NOT NULL,
-    check_out_at TIMESTAMP NOT NULL,
+    checked_out_at TIMESTAMP NULL,
     visit_status VARCHAR(30) NOT NULL, 
-    row_version INTEGER NOT NULL,
 
     FOREIGN KEY (appt_id) REFERENCES Appointment(appt_id),
     FOREIGN KEY (checked_in_by_staff_id) REFERENCES Staff(staff_id)
@@ -121,7 +121,8 @@ CREATE TABLE Remote_access (
     code_hash VARCHAR(255) UNIQUE NOT NULL,
     granted_at TIMESTAMP NOT NULL,
     expires_at TIMESTAMP NOT NULL,
-    consumed_at TIMESTAMP,
+    consumed_at TIMESTAMP NULL,
+    revoked_at TIMESTAMP NULL,
 
     FOREIGN KEY (staff_id) REFERENCES Staff(staff_id),
     FOREIGN KEY (patient_id) REFERENCES Patient(patient_id),

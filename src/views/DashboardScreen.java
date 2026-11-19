@@ -177,7 +177,17 @@ public class DashboardScreen extends JFrame {
         } else if (role.equalsIgnoreCase("Receptionist")) {
 
             panel.add(new JButton("Register Patient"));
-            panel.add(new JButton("Appointments"));
+
+            JButton appointments = new JButton("Appointments");
+            panel.add(appointments);
+
+            appointments.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    AppointmentsScreen screen = new AppointmentsScreen();
+                    screen.setVisible(true);
+                }
+            });
+
             panel.add(new JButton("Billing"));
 
         } else if (role.equalsIgnoreCase("Administrator")) {

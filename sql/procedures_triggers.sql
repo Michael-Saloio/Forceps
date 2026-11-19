@@ -559,6 +559,45 @@ DELIMITER ;
 
 DELIMITER //
 
+-- procedure to cancel an appointment (not delete)
+CREATE PROCEDURE cancel_appointment (
+    IN param_appt_id BIGINT
+)
+BEGIN
+
+    START TRANSACTION;
+
+    UPDATE Appointment
+    SET appt_status = 'CANCELLED'
+    WHERE appt_id = param_appt_id;
+
+    COMMIT;
+
+END//
+
+DELIMITER ;
+
+DELIMITER //
+
+-- procedure to delete an appointment
+CREATE PROCEDURE delete_appointment (
+    IN param_appt_id BIGINT
+)
+BEGIN
+
+    START TRANSACTION;
+
+    DELETE FROM Appointment
+    WHERE appt_id = param_appt_id;
+
+    COMMIT;
+
+END//
+
+DELIMITER ;
+
+DELIMITER //
+
 -- procedure to log visit / check in 
 CREATE PROCEDURE log_visit_check_in (
     IN param_visit_id BIGINT,
@@ -574,9 +613,7 @@ BEGIN
         appt_id,
         checked_in_by_staff_id,
         check_in_at,
-        check_out_at,
-        visit_status,
-        row_version
+        visit_status
 
     )
     VALUES(
@@ -584,10 +621,30 @@ BEGIN
         param_appt_id,
         param_checked_in_by_staff_id,
         CURRENT_TIMESTAMP,
-        CURRENT_TIMESTAMP,
-        "CHECKED IN", -- can be updated to checked out in java file
-        1 -- will be updated in java file when someone updates 
+        "CHECKED IN" -- can be updated to checked out in java file
     );
+
+    COMMIT;
+
+END//
+
+DELIMITER ;
+
+DELIMITER //
+
+-- procedure to log visit / check out
+CREATE PROCEDURE log_visit_check_out (
+    IN param_visit_id BIGINT
+)
+BEGIN
+
+    START TRANSACTION;
+    
+    UPDATE Visit
+    SET checked_out_at = CURRENT_TIMESTAMP,
+        visit_status = 'CHECKED OUT'
+
+    WHERE visit_id = param_visit_id;
 
     COMMIT;
 
@@ -638,4 +695,57 @@ BEGIN
 END//
 
 DELIMITER ;
+
+
+DELIMITER //
+
+-- procedure to revoke remote access
+CREATE PROCEDURE revoke_remote_access (
+    IN param_access_id BIGINT
+)
+BEGIN
+
+    START TRANSACTION;
+
+    UPDATE Remote_access
+    SET revoked_at = CURRENT_TIMESTAMP
+    WHERE access_id = param_access_id;
+
+    COMMIT;
+
+END//
+
+DELIMITER ;
+
+
+DELIMITER //
+
+-- procedure to offboard an employee (does not delete them)
+CREATE PROCEDURE offboard_employee (
+    IN param_staff_id BIGINT,
+    IN param_termination_date DATE,
+    IN param_termination_reason VARCHAR(500)
+)
+BEGIN
+
+    START TRANSACTION;
+
+    UPDATE Staff
+    SET termination_date = param_termination_date,
+        termination_reason = param_termination_reason
+    WHERE staff_id = param_staff_id;
+
+    UPDATE User_account
+    SET account_status = 'INACTIVE',
+        updated_at = CURRENT_TIMESTAMP
+    WHERE staff_id = param_staff_id;
+
+    COMMIT;
+
+END//
+
+DELIMITER ;
+
+
+
 
