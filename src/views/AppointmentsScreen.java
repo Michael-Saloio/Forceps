@@ -73,7 +73,7 @@ public class AppointmentsScreen extends JFrame implements ActionListener {
                     " | Patient: " + rs.getInt("patient_id") +
                     " | Doctor: " + rs.getInt("doctor_staff_id") +
                     " | Date: " + rs.getString("appointment_at") +
-                    "\n"};}
+                    "\n");}
             rs.close();
             st.close();
             con.close();}
