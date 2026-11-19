@@ -174,11 +174,23 @@ public class DashboardScreen extends JFrame {
         if (role.equalsIgnoreCase("Doctor") || role.equalsIgnoreCase("Nurse")) {
         return new ClinicalWorkspace(role, staffName);
 
-        } else if (role.equalsIgnoreCase("Receptionist")) {
+        } 
+else if (role.equalsIgnoreCase("Receptionist")) {
 
-            panel.add(new JButton("Register Patient"));
-            panel.add(new JButton("Appointments"));
-            panel.add(new JButton("Billing"));
+    panel.add(new JButton("Register Patient"));
+
+    JButton appointments = new JButton("Appointments");
+    panel.add(appointments);
+
+    appointments.addActionListener(new ActionListener() {
+        public void actionPerformed(ActionEvent e) {
+            AppointmentsScreen screen = new AppointmentsScreen();
+            screen.setVisible(true);
+        }
+    });
+
+    panel.add(new JButton("Billing"));
+
 
         } else if (role.equalsIgnoreCase("Administrator")) {
 
