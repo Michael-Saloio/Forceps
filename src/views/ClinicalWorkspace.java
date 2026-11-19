@@ -3,31 +3,27 @@ package views;
 import javax.swing.*;
 import java.awt.*;
 
-/** Role-specific clinical tools. Shared record navigation is provided by the dashboard. */
+/** Doctor and nurse actions connected to patient charts and assigned appointments. */
 public class ClinicalWorkspace extends JPanel {
-    public ClinicalWorkspace(String role, String name, long staffId) {
+    public ClinicalWorkspace(String role, String name, Runnable openRecords, Runnable openAppointments) {
         setLayout(new BorderLayout(8, 8));
         add(new JLabel("Welcome " + name + " - " + role), BorderLayout.NORTH);
-        JTabbedPane tabs = new JTabbedPane();
-        JPanel actions = new JPanel(new GridLayout(3, 1, 10, 10));
+        JPanel actions = new JPanel(new GridLayout(0, 1, 10, 10));
         if (role.equalsIgnoreCase("Doctor")) {
-            addButton(actions, "Treatments");
-            addButton(actions, "Appointments");
+            addAction(actions, "Patient Records", openRecords);
+            addAction(actions, "Treatment Plan", openRecords);
+            addAction(actions, "Appointments", openAppointments);
         } else if (role.equalsIgnoreCase("Nurse")) {
-            addButton(actions, "Patient Assignments");
-            addButton(actions, "Vital Signs");
-            addButton(actions, "Treatments");
+            addAction(actions, "Patient Assignments", openAppointments);
+            addAction(actions, "Vital Signs", openRecords);
+            addAction(actions, "Treatments", openRecords);
         }
-        tabs.addTab("Role tools", actions);
-        add(tabs, BorderLayout.CENTER);
+        add(actions, BorderLayout.CENTER);
     }
 
-    private void addButton(JPanel parent, String text) {
-        JButton button = new JButton(text);
+    private void addAction(JPanel parent, String label, Runnable action) {
+        JButton button = new JButton(label);
+        button.addActionListener(e -> action.run());
         parent.add(button);
-        button.addActionListener(e -> {
-            String info = JOptionPane.showInputDialog(this, "Enter " + text + " information:");
-            if (info != null && !info.trim().isEmpty()) JOptionPane.showMessageDialog(this, text + ": " + info);
-        });
     }
 }

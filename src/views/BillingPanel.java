@@ -49,6 +49,12 @@ public class BillingPanel extends JPanel {
         print.addActionListener(e -> printSelectedInvoice());
     }
 
+    /** Open billing for a patient selected from the dashboard search. */
+    public void openPatient(String id) {
+        patientId.setText(id == null ? "" : id);
+        loadInvoices();
+    }
+
     /** List invoice details with patient names so reception staff do not work from IDs alone. */
     private void loadInvoices() {
         model.setRowCount(0);
@@ -107,16 +113,14 @@ public class BillingPanel extends JPanel {
                 if (appointmentValue != null && !appointmentBelongsToPatient(c, appointmentValue, patientValue)) {
                     showMessage("That appointment does not belong to the selected patient."); return;
                 }
-                String sql = "INSERT INTO Invoice(patient_id, appointment_id, created_by_staff_id, invoice_date, description, amount, status, due_date) " +
-                        "VALUES(?,?,?,CURRENT_DATE,?,?, 'UNPAID',?)";
-                try (PreparedStatement q = c.prepareStatement(sql)) {
+                try (CallableStatement q = c.prepareCall("{CALL create_invoice(?, ?, ?, ?, ?, ?)}")) {
                     q.setLong(1, patientValue);
                     if (appointmentValue == null) q.setNull(2, Types.BIGINT); else q.setLong(2, appointmentValue);
                     q.setLong(3, staffId);
                     q.setString(4, description.getText().trim());
                     q.setBigDecimal(5, value);
                     q.setDate(6, due);
-                    q.executeUpdate();
+                    q.execute();
                 }
             }
             patientId.setText(patientKey);
@@ -162,12 +166,12 @@ public class BillingPanel extends JPanel {
                 if (appointmentValue != null && !appointmentBelongsToPatient(c, appointmentValue, patientKey)) {
                     showMessage("That appointment does not belong to the invoice's patient."); return;
                 }
-                String sql = "UPDATE Invoice SET appointment_id=?, description=?, amount=?, due_date=? WHERE invoice_id=? AND status='UNPAID'";
-                try (PreparedStatement q = c.prepareStatement(sql)) {
-                    if (appointmentValue == null) q.setNull(1, Types.BIGINT); else q.setLong(1, appointmentValue);
-                    q.setString(2, description.getText().trim()); q.setBigDecimal(3, value);
-                    q.setDate(4, due); q.setLong(5, invoiceId);
-                    if (q.executeUpdate() == 0) { showMessage("Invoice is paid or no longer exists."); return; }
+                try (CallableStatement q = c.prepareCall("{CALL update_invoice(?, ?, ?, ?, ?)}")) {
+                    q.setLong(1, invoiceId);
+                    if (appointmentValue == null) q.setNull(2, Types.BIGINT); else q.setLong(2, appointmentValue);
+                    q.setString(3, description.getText().trim()); q.setBigDecimal(4, value);
+                    q.setDate(5, due);
+                    q.execute();
                 }
             }
             loadInvoices();
@@ -193,10 +197,9 @@ public class BillingPanel extends JPanel {
         if (confirm != JOptionPane.OK_OPTION) return;
 
         long invoiceId = ((Number) model.getValueAt(row, 0)).longValue();
-        String sql = "UPDATE Invoice SET status='PAID', paid_date=CURRENT_DATE, paid_by_staff_id=? WHERE invoice_id=? AND status='UNPAID'";
-        try (Connection c = DatabaseConnection.getConnection(); PreparedStatement q = c.prepareStatement(sql)) {
-            q.setLong(1, staffId); q.setLong(2, invoiceId);
-            if (q.executeUpdate() == 0) { showMessage("Invoice is already paid or no longer exists."); return; }
+        try (Connection c = DatabaseConnection.getConnection(); CallableStatement q = c.prepareCall("{CALL mark_invoice_paid(?, ?)}")) {
+            q.setLong(1, invoiceId); q.setLong(2, staffId);
+            q.execute();
             loadInvoices();
             showMessage("Payment recorded.");
         } catch (SQLException ex) {
