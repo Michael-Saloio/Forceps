@@ -643,7 +643,18 @@ CREATE PROCEDURE log_visit_check_in (
 )
 BEGIN
 
-    START TRANSACTION;
+    IF NOT EXISTS (
+        SELECT 1 FROM Appointment
+        WHERE appt_id = param_appt_id
+          AND patient_id IS NOT NULL
+          AND appt_status <> 'CANCELLED'
+    ) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Register the patient and use an active appointment before check-in.';
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM Visit WHERE appt_id = param_appt_id) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'A visit is already recorded for this appointment.';
+    END IF;
 
     INSERT INTO Visit(
         visit_id,
@@ -661,8 +672,6 @@ BEGIN
         "CHECKED IN" -- can be updated to checked out in java file
     );
 
-    COMMIT;
-
 END//
 
 DELIMITER ;
@@ -676,15 +685,15 @@ CREATE PROCEDURE log_visit_check_out (
 )
 BEGIN
 
-    START TRANSACTION;
-    
     UPDATE Visit
     SET checked_out_at = CURRENT_TIMESTAMP,
         visit_status = 'CHECKED OUT'
+    WHERE visit_id = param_visit_id
+      AND visit_status = 'CHECKED IN';
 
-    WHERE visit_id = param_visit_id;
-
-    COMMIT;
+    IF ROW_COUNT() = 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Visit is not checked in or has already been checked out.';
+    END IF;
 
 END//
 

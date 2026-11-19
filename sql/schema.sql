@@ -103,7 +103,7 @@ CREATE TABLE Appointment (
 
 -- create visit table
 CREATE TABLE Visit(
-    visit_id BIGINT PRIMARY KEY,
+    visit_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     appt_id BIGINT UNIQUE NOT NULL, 
     checked_in_by_staff_id BIGINT NOT NULL,
     check_in_at TIMESTAMP NOT NULL,

@@ -9,11 +9,11 @@ Run these scripts once, in order, from MySQL Workbench or the MySQL command-line
 3. `sql/medical_billing_procedures.sql`
 4. `sql/seed_data.sql`
 
-The seed script creates demo staff, patients, assigned appointments, check-ins, sample medical records, and sample invoices. Checking a visit out automatically creates one unpaid $10 `Visit completion fee` invoice for that appointment. Reception can find it in the Billing view and print it or save it as a PDF. Do not rerun the seed script on a populated database.
+The seed script creates demo staff, patients, assigned appointments, check-ins, sample medical records, and sample invoices. Checking a visit out automatically creates one unpaid $10 `Visit completion fee` invoice for that appointment. The receptionist's appointment screen writes a printable HTML invoice to `Documents/Forceps/Invoices` and can open it for printing. Do not rerun the seed script on a populated database.
 
 ## Existing database migration
 
-If the database already has Staff, User_account, Patient, Appointment, Nurse, and Visit, apply `sql/appointments_staff_migration.sql` once. It enables generated IDs and adds optional nurse assignment for existing appointments; new bookings through the application require a nurse.
+If the database already has Staff, User_account, Patient, Appointment, Nurse, and Visit, apply `sql/appointments_staff_migration.sql` once. It enables generated IDs for new records, including visits, and adds optional nurse assignment for existing appointments; new bookings through the application require a nurse.
 
 If Medical_Record does not exist yet, run `sql/medical_billing.sql`. If it already exists, run `sql/medical_record_vitals_migration.sql` once instead. Then run `sql/procedures_triggers.sql` and `sql/medical_billing_procedures.sql` to replace the existing procedures with the updated versions. These two procedure scripts can be rerun safely; the data seed cannot.
 
