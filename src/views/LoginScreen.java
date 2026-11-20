@@ -107,7 +107,7 @@ public class LoginScreen extends JFrame {
         formPanel.setBorder(BorderFactory.createEmptyBorder(15, 50, 15, 50));
 
         userIdField = new JTextField();
-        userIdField.setText("User ID");
+        userIdField.setText("Account ID");
         userIdField.setForeground(Color.GRAY);
 
         passwordField = new JPasswordField();
@@ -148,7 +148,7 @@ public class LoginScreen extends JFrame {
         userIdField.addFocusListener(new java.awt.event.FocusAdapter() {
             @Override
             public void focusGained(java.awt.event.FocusEvent e) {
-                if (userIdField.getText().equals("User ID")) {
+                if (userIdField.getText().equals("Account ID")) {
                     userIdField.setText("");
                     userIdField.setForeground(Color.BLACK);
                 }
@@ -158,7 +158,7 @@ public class LoginScreen extends JFrame {
             public void focusLost(java.awt.event.FocusEvent e) {
                 if (userIdField.getText().isEmpty()) {
                     userIdField.setForeground(HINT_COLOR);
-                    userIdField.setText("User ID");
+                    userIdField.setText("Account ID");
                 }
             }
         });
@@ -189,7 +189,7 @@ public class LoginScreen extends JFrame {
                 char[] passwordChars = passwordField.getPassword();
                 handleLogin(userId, passwordChars);
             } catch (NumberFormatException ex) {
-                JOptionPane.showMessageDialog(this, "Please enter a valid User ID.", "Invalid Input",
+                JOptionPane.showMessageDialog(this, "Please enter a valid Account ID.", "Invalid Input",
                         JOptionPane.ERROR_MESSAGE);
             }
         });
@@ -295,7 +295,7 @@ public class LoginScreen extends JFrame {
                     // Password was incorrect
                     JOptionPane.showMessageDialog(
                             this,
-                            "Invalid User ID or Password.",
+                            "Invalid Account ID or Password.",
                             "Login Failed",
                             JOptionPane.ERROR_MESSAGE);
                 }
@@ -303,7 +303,7 @@ public class LoginScreen extends JFrame {
                 // No active account found with the entered ID
                 JOptionPane.showMessageDialog(
                         this,
-                        "Invalid User ID or Password.",
+                        "Invalid Account ID or Password.",
                         "Login Failed",
                         JOptionPane.ERROR_MESSAGE);
             }

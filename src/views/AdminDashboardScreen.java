@@ -9,7 +9,7 @@ import java.awt.event.MouseEvent;
 import java.util.List;
 import java.util.ArrayList;
 
-public class AdminDashBoardScreen extends JFrame {
+public class AdminDashboardScreen extends JFrame {
 
     private String staffName;
 
@@ -32,9 +32,9 @@ public class AdminDashBoardScreen extends JFrame {
     DefaultTableModel model;
     JTable table;
 
-    // Constructor for AdminDashBoardScreen
+    // Constructor for AdminDashboardScreen
     // Takes account name
-    public AdminDashBoardScreen(String name) {
+    public AdminDashboardScreen(String name) {
         staffName = name;
 
         setTitle("Forceps DBMS - System Admin Dashboard");
@@ -177,10 +177,10 @@ public class AdminDashBoardScreen extends JFrame {
                 }
 
                 if (staffMembers.isEmpty()) {
-                    JOptionPane.showMessageDialog(AdminDashBoardScreen.this, "No staff members found.");
+                    JOptionPane.showMessageDialog(AdminDashboardScreen.this, "No staff members found.");
                 }
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(AdminDashBoardScreen.this, "Search failed: " + ex.getMessage());
+                JOptionPane.showMessageDialog(AdminDashboardScreen.this, "Search failed: " + ex.getMessage());
             }
         });
 
@@ -278,7 +278,7 @@ public class AdminDashBoardScreen extends JFrame {
         if (staffId.getText().trim().isEmpty()
                 && firstName.getText().trim().isEmpty()
                 && lastName.getText().trim().isEmpty()) {
-            JOptionPane.showMessageDialog(AdminDashBoardScreen.this, "Please enter at least one search criteria.");
+            JOptionPane.showMessageDialog(AdminDashboardScreen.this, "Please enter at least one search criteria.");
             return false;
         }
         return true;

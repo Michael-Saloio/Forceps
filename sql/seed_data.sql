@@ -70,7 +70,7 @@ CALL add_remote_worker(
 -- RECEPTIONISTS 
 CALL add_receptionist(
     44567890, -- staff id
-    08456, -- account id 
+    8456, -- account id
     90909, -- account created by the system admin
     "Twilight",
     "Sparkle",
