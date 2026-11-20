@@ -32,6 +32,8 @@ public class AdminDashboardScreen extends JFrame {
     JButton addStaffButton;
     JButton viewRecordButton;
     JButton editRecordButton;
+    JButton grantRemoteAccessButton;
+    JButton revokeRemoteAccessButton;
 
     DefaultTableModel model;
     JTable table;
@@ -154,6 +156,17 @@ public class AdminDashboardScreen extends JFrame {
         // Edit record button
         editRecordButton = new JButton("Edit Record");
         optionsButtonPanel.add(editRecordButton).setEnabled(false);
+        editRecordButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        grantRemoteAccessButton = new JButton("Grant Remote Access");
+        grantRemoteAccessButton.setEnabled(false);
+        optionsButtonPanel.add(grantRemoteAccessButton);
+        grantRemoteAccessButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        revokeRemoteAccessButton = new JButton("Revoke Remote Access");
+        revokeRemoteAccessButton.setEnabled(false);
+        optionsButtonPanel.add(revokeRemoteAccessButton);
+        revokeRemoteAccessButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
         southPanel.add(optionsButtonPanel, BorderLayout.EAST);
 
         return southPanel;
@@ -203,6 +216,8 @@ public class AdminDashboardScreen extends JFrame {
                 // Enable/Disable buttons based on selection status
                 viewRecordButton.setEnabled(hasSelection);
                 editRecordButton.setEnabled(hasSelection);
+                grantRemoteAccessButton.setEnabled(hasSelection);
+                revokeRemoteAccessButton.setEnabled(hasSelection);
             }
         });
 
@@ -262,6 +277,14 @@ public class AdminDashboardScreen extends JFrame {
                         selectedStaffId);
                 editScreen.setVisible(true);
             }
+        });
+
+        grantRemoteAccessButton.addActionListener(e -> {
+            if (selectedStaffId != null) new GrantRemoteAccessScreen(selectedStaffId).setVisible(true);
+        });
+
+        revokeRemoteAccessButton.addActionListener(e -> {
+            if (selectedStaffId != null) new RevokeRemoteAccessScreen(selectedStaffId).setVisible(true);
         });
 
         // Future feature to be implemented, currently a placeholder

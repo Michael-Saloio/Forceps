@@ -757,8 +757,43 @@ CREATE PROCEDURE grant_remote_access (
     IN param_expires_at TIMESTAMP
 )
 BEGIN
+    DECLARE worker_is_active INT DEFAULT 0;
+    DECLARE patient_exists INT DEFAULT 0;
+    DECLARE administrator_is_active INT DEFAULT 0;
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    IF param_staff_id IS NULL OR param_patient_id IS NULL OR param_granted_by_staff_id IS NULL
+       OR param_code_hash IS NULL OR CHAR_LENGTH(TRIM(param_code_hash)) = 0 OR param_expires_at IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Worker, patient, administrator, code, and expiry are required.';
+    END IF;
+    IF param_expires_at <= CURRENT_TIMESTAMP THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'The access expiry must be in the future.';
+    END IF;
 
     START TRANSACTION;
+
+    SELECT COUNT(*) INTO worker_is_active
+    FROM Staff s JOIN Role r ON r.role_id = s.role_id
+    WHERE s.staff_id = param_staff_id AND r.role_name = 'Remote Worker' AND s.termination_date IS NULL;
+    IF worker_is_active = 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'The selected staff member is not an active remote worker.';
+    END IF;
+
+    SELECT COUNT(*) INTO patient_exists FROM Patient WHERE patient_id = param_patient_id;
+    IF patient_exists = 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'The selected patient was not found.';
+    END IF;
+
+    SELECT COUNT(*) INTO administrator_is_active
+    FROM Staff s JOIN Role r ON r.role_id = s.role_id
+    WHERE s.staff_id = param_granted_by_staff_id AND r.role_name = 'System Administrator' AND s.termination_date IS NULL;
+    IF administrator_is_active = 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'An active system administrator is required to grant access.';
+    END IF;
 
     INSERT INTO Remote_access(
         access_id,
@@ -796,12 +831,35 @@ CREATE PROCEDURE revoke_remote_access (
     IN param_access_id BIGINT
 )
 BEGIN
+    DECLARE existing_access_id BIGINT DEFAULT NULL;
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    IF param_access_id IS NULL OR param_access_id <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'A valid access ID is required.';
+    END IF;
 
     START TRANSACTION;
 
+    SELECT access_id INTO existing_access_id
+    FROM Remote_access
+    WHERE access_id = param_access_id AND revoked_at IS NULL
+    FOR UPDATE;
+
+    IF existing_access_id IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'No active grant was found for that access ID.';
+    END IF;
+
     UPDATE Remote_access
     SET revoked_at = CURRENT_TIMESTAMP
-    WHERE access_id = param_access_id;
+    WHERE access_id = param_access_id AND revoked_at IS NULL;
+
+    IF ROW_COUNT() <> 1 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'The remote access grant could not be revoked.';
+    END IF;
 
     COMMIT;
 
