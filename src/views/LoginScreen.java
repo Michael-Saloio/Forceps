@@ -327,7 +327,7 @@ public class LoginScreen extends JFrame {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        SwingUtilities.invokeLater(() -> new LoginScreen().setVisible(true));
+        SwingUtilities.invokeLater(() -> new DashboardScreen("michael", "Doctor").setVisible(true));
     }
 
 }

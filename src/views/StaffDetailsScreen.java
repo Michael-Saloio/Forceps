@@ -21,6 +21,7 @@ public class StaffDetailsScreen extends JFrame {
     private JComboBox<String> roleBox;
     private JTextField firstNameField;
     private JTextField lastNameField;
+    private JFormattedTextField dateOfBirth;
     private JFormattedTextField phoneField;
     private JTextField emailField;
     private JFormattedTextField hireDateField;
@@ -86,13 +87,33 @@ public class StaffDetailsScreen extends JFrame {
         JPanel formPanel = new JPanel(new GridLayout(0, 2, 10, 10));
         formPanel.setBorder(BorderFactory.createTitledBorder("Staff Member Details"));
 
+        // Phone & Date Formatters
+        try {
+            MaskFormatter phoneMask = new MaskFormatter("(###) ###-####");
+            phoneMask.setPlaceholderCharacter('_');
+            phoneField = new JFormattedTextField(phoneMask);
+
+            MaskFormatter dateMask = new MaskFormatter("##-##-####");
+            dateMask.setPlaceholderCharacter('_');
+            hireDateField = new JFormattedTextField(dateMask);
+            dateOfBirth = new JFormattedTextField(dateMask);
+            terminationDateField = new JFormattedTextField(dateMask);
+
+        } catch (ParseException e) {
+            e.printStackTrace();
+            phoneField = new JFormattedTextField();
+            hireDateField = new JFormattedTextField();
+            dateOfBirth = new JFormattedTextField();
+            terminationDateField = new JFormattedTextField();
+        }
+
         //Staff Id
         staffIdField = new JTextField(10);
         formPanel.add(new JLabel("Staff ID:"));
         formPanel.add(staffIdField);
 
         // Role Dropdown
-        String[] roles = {"Administrator", "Doctor", "Nurse"};
+        String[] roles = {"Doctor", "Nurse", "Receptionist", "System Administrator", "Remote Worker"};
         roleBox = new JComboBox<>(roles);
         formPanel.add(new JLabel("Role:"));
         formPanel.add(roleBox);
@@ -107,24 +128,14 @@ public class StaffDetailsScreen extends JFrame {
         formPanel.add(new JLabel("Last Name:"));
         formPanel.add(lastNameField);
 
+        // Date of birth
+        formPanel.add(new JLabel("Date of Birth (DD-MM-YYYY):"));
+        formPanel.add(dateOfBirth);
+
         // Email
         emailField = new JTextField(20);
         formPanel.add(new JLabel("Email Address:"));
         formPanel.add(emailField);
-
-        // Phone & Date Formatters
-        try {
-            MaskFormatter phoneMask = new MaskFormatter("(###) ###-####");
-            phoneMask.setPlaceholderCharacter('_');
-            phoneField = new JFormattedTextField(phoneMask);
-
-            MaskFormatter dateMask = new MaskFormatter("##-##-####");
-            dateMask.setPlaceholderCharacter('_');
-            hireDateField = new JFormattedTextField(dateMask);
-            terminationDateField = new JFormattedTextField(dateMask);
-        } catch (ParseException e) {
-            e.printStackTrace();
-        }
 
         // Phone number
         formPanel.add(new JLabel("Phone Number:"));
@@ -195,6 +206,8 @@ public class StaffDetailsScreen extends JFrame {
 
             if (mode == FormMode.EDIT) {
                 submitButton.setText("Save Changes");
+                setFieldsEditable(true);
+                staffIdField.setEditable(false);
 
                 // Locks down all fields for view-only mode
             } else if (mode == FormMode.VIEW) {
@@ -210,6 +223,7 @@ public class StaffDetailsScreen extends JFrame {
         roleBox.setEnabled(editable);
         firstNameField.setEditable(editable);
         lastNameField.setEditable(editable);
+        dateOfBirth.setEditable(editable);
         phoneField.setEditable(editable);
         emailField.setEditable(editable);
         hireDateField.setEditable(editable);
@@ -224,6 +238,7 @@ public class StaffDetailsScreen extends JFrame {
             staffIdField.setBorder(null);
             firstNameField.setBorder(null);
             lastNameField.setBorder(null);
+            dateOfBirth.setBorder(null);
             phoneField.setBorder(null);
             emailField.setBorder(null);
             hireDateField.setBorder(null);
@@ -236,6 +251,7 @@ public class StaffDetailsScreen extends JFrame {
             staffIdField.setBackground(backgroundBg);
             firstNameField.setBackground(backgroundBg);
             lastNameField.setBackground(backgroundBg);
+            dateOfBirth.setBackground(backgroundBg);
             phoneField.setBackground(backgroundBg);
             emailField.setBackground(backgroundBg);
             hireDateField.setBackground(backgroundBg);
@@ -244,35 +260,39 @@ public class StaffDetailsScreen extends JFrame {
             } 
 
         } else {
-        // RESTORES default cosmestics for accoutn details under ADD / EDIT modes
-        staffIdField.setBorder(UIManager.getBorder("TextField.border"));
-        firstNameField.setBorder(UIManager.getBorder("TextField.border"));
-        lastNameField.setBorder(UIManager.getBorder("TextField.border"));
-        phoneField.setBorder(UIManager.getBorder("TextField.border"));
-        emailField.setBorder(UIManager.getBorder("TextField.border"));
-        hireDateField.setBorder(UIManager.getBorder("TextField.border"));
-        if (terminationDateField != null) {
-            terminationDateField.setBorder(UIManager.getBorder("TextField.border"));
-        }
+            // RESTORES default cosmestics for accoutn details under ADD / EDIT modes
+            staffIdField.setBorder(UIManager.getBorder("TextField.border"));
+            firstNameField.setBorder(UIManager.getBorder("TextField.border"));
+            lastNameField.setBorder(UIManager.getBorder("TextField.border"));
+            dateOfBirth.setBorder(UIManager.getBorder("TextField.border"));
+            phoneField.setBorder(UIManager.getBorder("TextField.border"));
+            emailField.setBorder(UIManager.getBorder("TextField.border"));
+            hireDateField.setBorder(UIManager.getBorder("TextField.border"));
+            if (terminationDateField != null) {
+                terminationDateField.setBorder(UIManager.getBorder("TextField.border"));
+            }
 
-        staffIdField.setBackground(Color.WHITE);
-        firstNameField.setBackground(Color.WHITE);
-        lastNameField.setBackground(Color.WHITE);
-        phoneField.setBackground(Color.WHITE);
-        emailField.setBackground(Color.WHITE);
-        hireDateField.setBackground(Color.WHITE);
-        if (terminationDateField != null) {
-            terminationDateField.setBackground(Color.WHITE);
+            staffIdField.setBackground(Color.WHITE);
+            firstNameField.setBackground(Color.WHITE);
+            lastNameField.setBackground(Color.WHITE);
+            dateOfBirth.setBackground(Color.WHITE);
+            phoneField.setBackground(Color.WHITE);
+            emailField.setBackground(Color.WHITE);
+            hireDateField.setBackground(Color.WHITE);
+            if (terminationDateField != null) {
+                terminationDateField.setBackground(Color.WHITE);
+            }
         }
     }
-}
 
     // Validates account detail inputs by checking to see if each field was filled
     private boolean validateInputs() {
-        if (mode == FormMode.ADD 
-            && staffIdField.getText().trim().isEmpty() 
+        boolean missingAddId = (mode == FormMode.ADD && staffIdField.getText().trim().isEmpty());
+
+        if (missingAddId
             || firstNameField.getText().trim().isEmpty() 
             || lastNameField.getText().trim().isEmpty()
+            || dateOfBirth.getText().contains("_")
             || phoneField.getText().contains("_")
             || emailField.getText().trim().isEmpty()
             || hireDateField.getText().trim().contains("_")) {
@@ -300,6 +320,7 @@ public class StaffDetailsScreen extends JFrame {
         String role = (String) roleBox.getSelectedItem();
         String firstName = firstNameField.getText().trim();
         String lastName = lastNameField.getText().trim();
+        String dob = dateOfBirth.getText().trim();
         String phone = phoneField.getText().trim();
         String email = emailField.getText().trim();
         String hireDate = hireDateField.getText().trim();
@@ -312,6 +333,7 @@ public class StaffDetailsScreen extends JFrame {
                     "Role: " + role + "\n" +
                     "First Name: " + firstName + "\n" +
                     "Last Name: " + lastName + "\n" +
+                    "Date of Birth: " + dob + "\n" +
                     "Phone: " + phone + "\n" +
                     "Email: " + email + "\n" +
                     "Hire Date: " + hireDate + "\n" +
@@ -321,6 +343,7 @@ public class StaffDetailsScreen extends JFrame {
                     "Role: " + role + "\n" +
                     "First Name: " + firstName + "\n" +
                     "Last Name: " + lastName + "\n" +
+                    "Date of Birth: " + dob + "\n" +
                     "Phone: " + phone + "\n" +
                     "Email: " + email + "\n" +
                     "Hire Date: " + hireDate + "\n" +

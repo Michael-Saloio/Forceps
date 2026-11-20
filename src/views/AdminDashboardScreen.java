@@ -21,11 +21,13 @@ public class AdminDashBoardScreen extends JFrame {
     JTextField staffId;
     JTextField firstName;
     JTextField lastName;
+    JTextField dateOfBirth;
 
     JButton searchButton;
     JButton exportButton;
     JButton settingsButton;
-    JButton addStaffButton;
+    JButton onBoardButton;
+    JButton offBoardButton;
     JButton viewRecordButton;
     JButton editRecordButton; 
 
@@ -98,6 +100,8 @@ public class AdminDashBoardScreen extends JFrame {
         staffId = new JTextField(15);
         firstName = new JTextField(15);
         lastName = new JTextField(15);
+        dateOfBirth = new JTextField(15);
+
         searchButton = new JButton("Search");
 
         searchInputs.add(new JLabel("Staff ID:"));
@@ -106,12 +110,14 @@ public class AdminDashBoardScreen extends JFrame {
         searchInputs.add(firstName);
         searchInputs.add(new JLabel("Last Name:"));
         searchInputs.add(lastName);
+        searchInputs.add(new JLabel("DOB:"));
+        searchInputs.add(dateOfBirth);
         searchInputs.add(searchButton);
 
         searchButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
         // Table for results
-        String[] columns = { "Staff ID", "Role ID", "First Name", "Last Name", "Email", "Account Active?" };
+        String[] columns = { "Staff ID", "Role ID", "First Name", "Last Name", "Date of Birth", "Account Active?" };
 
         // Prevents editing any cell on click or double-click
         model = new DefaultTableModel(columns, 0) {
@@ -136,9 +142,14 @@ public class AdminDashBoardScreen extends JFrame {
         JPanel optionsButtonPanel = new JPanel();
 
         // Create new staff account 
-        addStaffButton = new JButton("Create New Staff Account");
-        optionsButtonPanel.add(addStaffButton);
-        addStaffButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        onBoardButton = new JButton("Onboard");
+        optionsButtonPanel.add(onBoardButton);
+        onBoardButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        // Removes staff account
+        offBoardButton = new JButton("Offboard");
+        optionsButtonPanel.add(offBoardButton).setEnabled(false);
+        onBoardButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
         // View record button
         viewRecordButton = new JButton("View");
@@ -232,9 +243,14 @@ public class AdminDashBoardScreen extends JFrame {
         });
 
         // Opens Add New Staff screen
-        addStaffButton.addActionListener(e -> {
+        onBoardButton.addActionListener(e -> {
             StaffDetailsScreen addScreen = new StaffDetailsScreen(StaffDetailsScreen.FormMode.ADD, null);
             addScreen.setVisible(true);
+        });
+
+        // Opens remove staff screen
+        offBoardButton.addActionListener(e -> {
+            SwingUtilities.invokeLater(() -> new OffBoardStaffScreen(selectedStaffId).setVisible(true));
         });
 
         // Opens View mode
