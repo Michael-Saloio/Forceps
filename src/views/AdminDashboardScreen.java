@@ -128,6 +128,11 @@ public class AdminDashBoardScreen extends JFrame {
         };
         table = new JTable(model);
 
+        // Quick mock rows to test table selection and features
+        // model.addRow(new Object[]{"101", "Doctor", "Sarah", "Jenkins", "14-05-1988", "Yes"});
+        // model.addRow(new Object[]{"102", "Nurse", "Marcus", "Vance", "22-09-1992", "Yes"});
+        // model.addRow(new Object[]{"103", "Administrator", "Elena", "Rostova", "03-11-1985", "No"});
+
         searchAndTablePanel.add(searchInputs, BorderLayout.NORTH);
         searchAndTablePanel.add(new JScrollPane(table), BorderLayout.CENTER);
         
@@ -143,22 +148,28 @@ public class AdminDashBoardScreen extends JFrame {
 
         // Create new staff account 
         onBoardButton = new JButton("Onboard");
-        optionsButtonPanel.add(onBoardButton);
+        onBoardButton.setEnabled(true);
         onBoardButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        optionsButtonPanel.add(onBoardButton);
 
         // Removes staff account
         offBoardButton = new JButton("Offboard");
-        optionsButtonPanel.add(offBoardButton).setEnabled(false);
-        onBoardButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        offBoardButton.setEnabled(false);
+        offBoardButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        optionsButtonPanel.add(offBoardButton);
 
         // View record button
         viewRecordButton = new JButton("View");
-        optionsButtonPanel.add(viewRecordButton).setEnabled(false);
+        viewRecordButton.setEnabled(false);
         viewRecordButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        optionsButtonPanel.add(viewRecordButton);
 
         // Edit record button
         editRecordButton = new JButton("Edit Record");
-        optionsButtonPanel.add(editRecordButton).setEnabled(false);
+        editRecordButton.setEnabled(false);
+        editRecordButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        optionsButtonPanel.add(editRecordButton);
+
         southPanel.add(optionsButtonPanel, BorderLayout.EAST);
 
         return southPanel;
@@ -192,7 +203,7 @@ public class AdminDashBoardScreen extends JFrame {
             }
         });
 
-        // Controls view/edit buttons based on table selection
+        // Controls view/edit/offboard buttons based on table selection
         table.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
                 int selectedRow = table.getSelectedRow();
@@ -207,6 +218,7 @@ public class AdminDashBoardScreen extends JFrame {
                 // Enable/Disable buttons based on selection status
                 viewRecordButton.setEnabled(hasSelection);
                 editRecordButton.setEnabled(hasSelection);
+                offBoardButton.setEnabled(hasSelection);
             }
         });
 

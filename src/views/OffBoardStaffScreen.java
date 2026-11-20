@@ -130,7 +130,7 @@ public class OffBoardStaffScreen extends JFrame {
 
         int choice = JOptionPane.showConfirmDialog(
             this,
-            "Are you sure you want to Offboard Staff " + fName + " " + lName + " (ID: " + idText + ")?",
+            "Are you sure you want to Offboard Staff" + fName + " " + lName + "(ID: " + idText + ")?",
             "Confirm Submission",
             JOptionPane.YES_NO_OPTION,
             JOptionPane.QUESTION_MESSAGE
