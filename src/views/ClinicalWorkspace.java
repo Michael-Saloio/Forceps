@@ -1,24 +1,29 @@
 package views;
+
 import javax.swing.*;
 import java.awt.*;
+
+/** Doctor and nurse actions connected to patient charts and assigned appointments. */
 public class ClinicalWorkspace extends JPanel {
-    public ClinicalWorkspace(String role, String name) {
-        setLayout(new GridLayout(4, 1, 10, 10));
-        add(new JLabel("Welcome " + name + " - " + role));
+    public ClinicalWorkspace(String role, String name, Runnable openRecords, Runnable openAppointments) {
+        setLayout(new BorderLayout(8, 8));
+        add(new JLabel("Welcome " + name + " - " + role), BorderLayout.NORTH);
+        JPanel actions = new JPanel(new GridLayout(0, 1, 10, 10));
         if (role.equalsIgnoreCase("Doctor")) {
-            addButton("Patient Records");
-            addButton("Treatments");
-            addButton("Appointments");}
-        if (role.equalsIgnoreCase("Nurse")) {
-            addButton("Patient Assignments");
-            addButton("Vital Signs");
-            addButton("Treatments");}}
-    void addButton(String text) {
-        JButton button = new JButton(text);
-        add(button);
-        button.addActionListener(e -> {
-            String info = JOptionPane.showInputDialog(
-                "Enter " + text + " information:");
-            if (info != null && !info.isEmpty()) {
-                JOptionPane.showMessageDialog(
-                    this, text + ": " + info);}});}}
+            addAction(actions, "Patient Records", openRecords);
+            addAction(actions, "Treatment Plan", openRecords);
+            addAction(actions, "Appointments", openAppointments);
+        } else if (role.equalsIgnoreCase("Nurse")) {
+            addAction(actions, "Patient Assignments", openAppointments);
+            addAction(actions, "Vital Signs", openRecords);
+            addAction(actions, "Treatments", openRecords);
+        }
+        add(actions, BorderLayout.CENTER);
+    }
+
+    private void addAction(JPanel parent, String label, Runnable action) {
+        JButton button = new JButton(label);
+        button.addActionListener(e -> action.run());
+        parent.add(button);
+    }
+}
