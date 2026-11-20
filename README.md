@@ -1,27 +1,28 @@
 # Forceps Hospital Database System
 
-## Database setup
+## Fresh database
 
-For a fresh local database, run these scripts in order using MySQL Workbench or the MySQL command-line client:
+Run these scripts once, in order, from MySQL Workbench or the MySQL command-line client:
 
 1. `sql/schema.sql`
 2. `sql/procedures_triggers.sql`
-3. `sql/seed_data.sql` (run once; it inserts demonstration accounts, patients, appointments, and visits)
+3. `sql/medical_billing_procedures.sql`
+4. `sql/seed_data.sql`
 
-For an existing Forceps database that already has the `Patient`, `Staff`, `Appointment`, and `Visit` tables, run `sql/medical_billing.sql` to add the medical-record and invoice tables. Do not rerun `schema.sql` over an existing database.
+The seed script creates demo staff, patients, assigned appointments, check-ins, sample medical records, and sample invoices. Checking a visit out automatically creates one unpaid $10 `Visit completion fee` invoice for that appointment. The receptionist's appointment screen writes a printable HTML invoice to `Documents/Forceps/Invoices` and can open it for printing. Do not rerun the seed script on a populated database.
 
-The desktop app defaults to `jdbc:mysql://localhost:3306/forceps` and the MySQL user `root`. Set `FORCEPS_DB_URL`, `FORCEPS_DB_USER`, and `FORCEPS_DB_PASSWORD` in the environment to use different local connection settings. The password is not stored in source control. For example:
+## Existing database migration
 
-```sh
-export FORCEPS_DB_URL='jdbc:mysql://localhost:3306/forceps'
-export FORCEPS_DB_USER='root'
-export FORCEPS_DB_PASSWORD='your-local-mysql-password'
-```
+If the database already has Staff, User_account, Patient, Appointment, Nurse, and Visit, apply `sql/appointments_staff_migration.sql` once. It enables generated IDs for new records, including visits, and adds optional nurse assignment for existing appointments; new bookings through the application require a nurse.
 
-Start the app from the same environment so Java receives those variables. The MySQL Connector/J jar is in `lib/`.
+If Medical_Record does not exist yet, run `sql/medical_billing.sql`. If it already exists, run `sql/medical_record_vitals_migration.sql` once instead. Then run `sql/procedures_triggers.sql` and `sql/medical_billing_procedures.sql` to replace the existing procedures with the updated versions. These two procedure scripts can be rerun safely; the data seed cannot.
 
-## Medical records and billing
+Existing appointments remain unassigned until a receptionist uses **Assign / change nurse**. Existing appointment rows with visit history are cancelled rather than deleted when removed, preserving the foreign-key history.
 
-Doctors and nurses can search records by patient ID, create records, and edit diagnosis, treatment, and notes. A record can be linked to a visit belonging to that patient. Receptionists can search invoices, create invoices with optional appointment links, edit unpaid invoices, record payments, and print invoices. Payment updates store the staff member and date for the audit trail.
+## Local connection settings
 
-The medical-record patient field supports keyboard-wedge barcode scanners: configure the barcode label to contain the numeric `patient_id`; the scanner types that value into the field and submits it. No extra barcode column is needed for that format. A barcode containing a different value needs a database mapping before it can be looked up.
+The app defaults to `jdbc:mysql://localhost:3306/forceps` and the MySQL user `root`. Configure `FORCEPS_DB_URL`, `FORCEPS_DB_USER`, and `FORCEPS_DB_PASSWORD` in the environment used to launch the Java app. Passwords should stay out of source control.
+
+## Patient barcodes
+
+The app prints Code 39 labels containing the numeric patient ID. A keyboard-wedge scanner types that ID into the clinical chart field; the field also accepts start/stop `*` characters some scanners return. A different barcode payload needs a database mapping before it can identify a patient.
