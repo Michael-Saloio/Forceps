@@ -127,6 +127,50 @@ CALL add_patient(
     'Equestria',
     NULL
 );
+CALL add_patient(
+    10005, -- patient id
+    'Mary',
+    'Brown',
+    '1977-03-03',
+    '226-226-2626',
+    '26 Twin Street',
+    'Stoneville',
+    'Imaginary State',
+    NULL
+);
+CALL add_patient(
+    10006, -- patient id
+    'James',
+    'Bond',
+    '1962-01-01',
+    NULL,
+    '123 Cool Road',
+    'City',
+    'State',
+    'A1A 2B2'
+);
+CALL add_patient(
+    10007, -- patient id
+    'John',
+    'Smith',
+    '1970-09-13',
+    '519-991-1919',
+    '1919 Serpent Rd',
+    'Town',
+    'State',
+    'B1B 1A1'
+);
+CALL add_patient(
+    10008, -- patient id
+    'Octavius',
+    'Roman',
+    '1969-7-08',
+    '111-222-3214',
+    '12 Pool Blvd',
+    'Swimming Region',
+    'State',
+    'N8N 8N8'
+);
 
 -- APPOINTMENTS 
 CALL book_appointment(
@@ -175,7 +219,17 @@ CALL book_prospective_appointment(
     11011019, -- doctor id
     320006, -- nurse id
     44567890, -- booked by receptionist staff id 
-    "2026-12-01 09:00:00", -- scheduled appt time
+    "2026-11-26 09:00:00", -- walk in appt time
+    "Walk-in Consultation"
+);
+CALL book_prospective_appointment(
+    00006, -- appt id
+    "Johnny", 
+    "Test", 
+    "1993-10-31",
+    11011019, -- doctor id
+    44567890, -- booked by receptionist staff id 
+    "2026-11-26 11:00:00", -- walk in appt time
     "Walk-in Consultation"
 );
 -- CHECK IN 
