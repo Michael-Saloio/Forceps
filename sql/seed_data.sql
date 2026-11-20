@@ -220,6 +220,22 @@ VALUES
     (10003, 100002, 11011019, '2026-11-19', 145.00, 42.00, 'BP 106/68; pulse 88 bpm; temperature 36.7 C',
         'Imaging follow-up', 'X-ray completed', 'Follow up with the referring clinician.');
 
+-- Additional fictional longitudinal charts make every seeded patient usable in the medical-records GUI.
+-- These older records are not tied to an appointment; the current checked-in visits above remain linked.
+INSERT INTO Medical_Record(patient_id, visit_id, clinician_staff_id, visit_date, height_cm, weight_kg,
+    vitals_summary, diagnosis, treatment, notes)
+VALUES
+    (10001, NULL, 11011019, '2026-08-12', 169.50, 67.80, 'BP 116/74; pulse 70 bpm; temperature 36.7 C',
+        'Minor ankle sprain, resolved', 'Rest and ice; gradual return to activity', 'No ongoing symptoms reported at follow-up.'),
+    (10002, NULL, 11011019, '2026-10-03', 162.00, 58.40, 'BP 112/72; pulse 76 bpm; temperature 36.6 C',
+        'Seasonal allergic rhinitis', 'Allergen avoidance reviewed; supportive care discussed', 'Fictional sample chart entry for GUI demonstration.'),
+    (10002, NULL, 11011019, '2026-11-10', 162.00, 58.20, 'BP 110/70; pulse 74 bpm; temperature 36.5 C',
+        'Allergy follow-up', 'Symptoms improved; continue current care plan', 'Follow-up entry for demonstrating multiple records per patient.'),
+    (10003, NULL, 11011019, '2026-09-18', 144.50, 41.50, 'BP 104/66; pulse 84 bpm; temperature 36.8 C',
+        'Preventive health visit', 'Routine health guidance provided', 'Fictional sample chart entry; guardian present.'),
+    (10004, NULL, 11011019, '2026-10-28', 168.00, 62.00, 'BP 114/72; pulse 72 bpm; temperature 36.7 C',
+        'Routine wellness visit', 'Preventive care reviewed', 'Fictional sample chart entry for GUI demonstration.');
+
 -- Sample invoices for the receptionist billing view.
 INSERT INTO Invoice(patient_id, appointment_id, created_by_staff_id, invoice_date, description, amount, status, due_date, paid_date, paid_by_staff_id)
 VALUES
