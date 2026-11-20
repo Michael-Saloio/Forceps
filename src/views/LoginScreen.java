@@ -107,7 +107,7 @@ public class LoginScreen extends JFrame {
         formPanel.setBorder(BorderFactory.createEmptyBorder(15, 50, 15, 50));
 
         userIdField = new JTextField();
-        userIdField.setText("User ID");
+        userIdField.setText("Account ID");
         userIdField.setForeground(Color.GRAY);
 
         passwordField = new JPasswordField();
@@ -143,11 +143,12 @@ public class LoginScreen extends JFrame {
     }
 
     // Sets up listeners for user interactions with the login screen components
+    // TO DO: Implement "forgot your password" functionality in the future
     private void setupListeners() {
         userIdField.addFocusListener(new java.awt.event.FocusAdapter() {
             @Override
             public void focusGained(java.awt.event.FocusEvent e) {
-                if (userIdField.getText().equals("User ID")) {
+                if (userIdField.getText().equals("Account ID")) {
                     userIdField.setText("");
                     userIdField.setForeground(Color.BLACK);
                 }
@@ -157,7 +158,7 @@ public class LoginScreen extends JFrame {
             public void focusLost(java.awt.event.FocusEvent e) {
                 if (userIdField.getText().isEmpty()) {
                     userIdField.setForeground(HINT_COLOR);
-                    userIdField.setText("User ID");
+                    userIdField.setText("Account ID");
                 }
             }
         });
@@ -188,7 +189,7 @@ public class LoginScreen extends JFrame {
                 char[] passwordChars = passwordField.getPassword();
                 handleLogin(userId, passwordChars);
             } catch (NumberFormatException ex) {
-                JOptionPane.showMessageDialog(this, "Please enter a valid User ID.", "Invalid Input",
+                JOptionPane.showMessageDialog(this, "Please enter a valid Account ID.", "Invalid Input",
                         JOptionPane.ERROR_MESSAGE);
             }
         });
@@ -238,7 +239,8 @@ public class LoginScreen extends JFrame {
                     ua.password_hash,
                     r.role_name,
                     s.first_name,
-                    s.last_name
+                    s.last_name,
+                    s.staff_id
                 FROM User_account ua
                 JOIN Staff s
                     ON ua.staff_id = s.staff_id
@@ -271,6 +273,7 @@ public class LoginScreen extends JFrame {
                 String firstName = rs.getString("first_name");
                 // Get last name
                 String lastName = rs.getString("last_name");
+                long staffId = rs.getLong("staff_id");
                 // Compare the stored hash with the hash of the entered password
                 if (storedPassword.equals(hashedEnteredPassword)) {
 
@@ -285,14 +288,14 @@ public class LoginScreen extends JFrame {
                             "Login Successful",
                             JOptionPane.INFORMATION_MESSAGE);
                    new DashboardScreen(
-                        firstName + " " + lastName, role ).setVisible(true);
+                        firstName + " " + lastName, role, staffId ).setVisible(true);
                         dispose();
 
                 } else {
                     // Password was incorrect
                     JOptionPane.showMessageDialog(
                             this,
-                            "Invalid User ID or Password.",
+                            "Invalid Account ID or Password.",
                             "Login Failed",
                             JOptionPane.ERROR_MESSAGE);
                 }
@@ -300,7 +303,7 @@ public class LoginScreen extends JFrame {
                 // No active account found with the entered ID
                 JOptionPane.showMessageDialog(
                         this,
-                        "Invalid User ID or Password.",
+                        "Invalid Account ID or Password.",
                         "Login Failed",
                         JOptionPane.ERROR_MESSAGE);
             }

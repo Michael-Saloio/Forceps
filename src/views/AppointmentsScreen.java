@@ -1,13 +1,16 @@
 package views;
+
 import database.DatabaseConnection;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.sql.*;
+
 public class AppointmentsScreen extends JFrame implements ActionListener {
     JTextField patient, doctor, date;
     JButton addButton, viewButton, deleteButton;
     JTextArea area;
+
     public AppointmentsScreen() {
         setTitle("Appointments");
         setSize(500, 400);
@@ -35,21 +38,27 @@ public class AppointmentsScreen extends JFrame implements ActionListener {
         addButton.addActionListener(this);
         viewButton.addActionListener(this);
         deleteButton.addActionListener(this);
-        viewAppointments();}
+        viewAppointments();
+    }
 
     public void actionPerformed(ActionEvent e) {
         if (e.getSource() == addButton) {
-            addAppointment();}
+            addAppointment();
+        }
         if (e.getSource() == viewButton) {
-            viewAppointments();}
+            viewAppointments();
+        }
         if (e.getSource() == deleteButton) {
-            deleteAppointment();}}
+            deleteAppointment();
+        }
+    }
+
     void addAppointment() {
         try {
             Connection con = DatabaseConnection.getConnection();
             String sql = "INSERT INTO Appointment " +
-                         "(patient_id, doctor_staff_id, appointment_at) " +
-                         "VALUES (?, ?, ?)";
+                    "(patient_id, doctor_id, scheduled_at) " +
+                    "VALUES (?, ?, ?)";
             PreparedStatement ps = con.prepareStatement(sql);
             ps.setInt(1, Integer.parseInt(patient.getText()));
             ps.setInt(2, Integer.parseInt(doctor.getText()));
@@ -60,7 +69,10 @@ public class AppointmentsScreen extends JFrame implements ActionListener {
             con.close();
             viewAppointments();
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, e.getMessage());}}
+            JOptionPane.showMessageDialog(this, e.getMessage());
+        }
+    }
+
     void viewAppointments() {
         area.setText("");
         try {
@@ -69,23 +81,28 @@ public class AppointmentsScreen extends JFrame implements ActionListener {
             ResultSet rs = st.executeQuery("SELECT * FROM Appointment");
             while (rs.next()) {
                 area.append(
-                    "ID: " + rs.getInt("appointment_id") +
-                    " | Patient: " + rs.getInt("patient_id") +
-                    " | Doctor: " + rs.getInt("doctor_staff_id") +
-                    " | Date: " + rs.getString("appointment_at") +
-                    "\n");}
+                        "ID: " + rs.getInt("appt_id") +
+                                " | Patient: " + rs.getInt("patient_id") +
+                                " | Doctor: " + rs.getInt("doctor_id") +
+                                " | Date: " + rs.getString("scheduled_at") +
+                                "\n");
+            }
             rs.close();
             st.close();
-            con.close();}
-        catch (Exception e) {
-            JOptionPane.showMessageDialog(this, e.getMessage());}}
+            con.close();
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, e.getMessage());
+        }
+    }
+
     void deleteAppointment() {
         String id = JOptionPane.showInputDialog(this, "Appointment ID:");
         if (id == null || id.isEmpty()) {
-            return;}
+            return;
+        }
         try {
             Connection con = DatabaseConnection.getConnection();
-            String sql = "DELETE FROM Appointment WHERE appointment_id = ?";
+            String sql = "DELETE FROM Appointment WHERE appt_id = ?";
             PreparedStatement ps = con.prepareStatement(sql);
             ps.setInt(1, Integer.parseInt(id));
             ps.executeUpdate();
@@ -94,5 +111,7 @@ public class AppointmentsScreen extends JFrame implements ActionListener {
             con.close();
             viewAppointments();
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, e.getMessage());}}
+            JOptionPane.showMessageDialog(this, e.getMessage());
+        }
+    }
 }
