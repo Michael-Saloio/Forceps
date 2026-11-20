@@ -143,6 +143,7 @@ public class LoginScreen extends JFrame {
     }
 
     // Sets up listeners for user interactions with the login screen components
+    // TO DO: Implement "forgot your password" functionality in the future
     private void setupListeners() {
         userIdField.addFocusListener(new java.awt.event.FocusAdapter() {
             @Override
@@ -238,7 +239,8 @@ public class LoginScreen extends JFrame {
                     ua.password_hash,
                     r.role_name,
                     s.first_name,
-                    s.last_name
+                    s.last_name,
+                    s.staff_id
                 FROM User_account ua
                 JOIN Staff s
                     ON ua.staff_id = s.staff_id
@@ -271,6 +273,7 @@ public class LoginScreen extends JFrame {
                 String firstName = rs.getString("first_name");
                 // Get last name
                 String lastName = rs.getString("last_name");
+                long staffId = rs.getLong("staff_id");
                 // Compare the stored hash with the hash of the entered password
                 if (storedPassword.equals(hashedEnteredPassword)) {
 
@@ -285,7 +288,7 @@ public class LoginScreen extends JFrame {
                             "Login Successful",
                             JOptionPane.INFORMATION_MESSAGE);
                    new DashboardScreen(
-                        firstName + " " + lastName, role ).setVisible(true);
+                        firstName + " " + lastName, role, staffId ).setVisible(true);
                         dispose();
 
                 } else {
