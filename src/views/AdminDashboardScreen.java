@@ -6,6 +6,10 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.ArrayList;
 
@@ -284,12 +288,46 @@ public class AdminDashboardScreen extends JFrame {
         return true;
     }
 
-    // ArrayList to hold database query logic
-    // TO DO: IMPLEMENT DATABASE LOGIC
-    // ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    private List<String[]> searchStaff(String id, String firstname, String lastname) {
+    /** Search staff by any combination of staff ID, first name, and last name. */
+    private List<String[]> searchStaff(String id, String firstname, String lastname) throws SQLException {
         List<String[]> results = new ArrayList<>();
+        StringBuilder sql = new StringBuilder(
+                "SELECT s.staff_id, s.role_id, s.first_name, s.last_name, s.email, " +
+                "COALESCE(ua.account_status, 'NO ACCOUNT') AS account_status " +
+                "FROM Staff s LEFT JOIN User_account ua ON ua.staff_id=s.staff_id WHERE 1=1");
+        Long staffIdValue = null;
+        if (!id.isEmpty()) {
+            try {
+                staffIdValue = Long.valueOf(id);
+                if (staffIdValue <= 0) throw new NumberFormatException();
+            } catch (NumberFormatException ex) {
+                throw new IllegalArgumentException("Staff ID must be a positive whole number.");
+            }
+            sql.append(" AND s.staff_id=?");
+        }
+        if (!firstname.isEmpty()) sql.append(" AND LOWER(s.first_name)=LOWER(?)");
+        if (!lastname.isEmpty()) sql.append(" AND LOWER(s.last_name)=LOWER(?)");
+        sql.append(" ORDER BY s.last_name, s.first_name, s.staff_id");
 
+        try (Connection connection = database.DatabaseConnection.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql.toString())) {
+            int parameter = 1;
+            if (staffIdValue != null) statement.setLong(parameter++, staffIdValue);
+            if (!firstname.isEmpty()) statement.setString(parameter++, firstname);
+            if (!lastname.isEmpty()) statement.setString(parameter, lastname);
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    results.add(new String[]{
+                            result.getString("staff_id"),
+                            result.getString("role_id"),
+                            result.getString("first_name"),
+                            result.getString("last_name"),
+                            result.getString("email"),
+                            result.getString("account_status")
+                    });
+                }
+            }
+        }
         return results;
     }
 }
