@@ -30,6 +30,8 @@ public class AdminDashBoardScreen extends JFrame {
     JButton offBoardButton;
     JButton viewRecordButton;
     JButton editRecordButton; 
+    JButton grantRemoteAccessButton;
+    JButton revokeRemoteAccessButton;
 
     DefaultTableModel model;
     JTable table;
@@ -128,10 +130,10 @@ public class AdminDashBoardScreen extends JFrame {
         };
         table = new JTable(model);
 
-        // Quick mock rows to test table selection and features
-        // model.addRow(new Object[]{"101", "Doctor", "Sarah", "Jenkins", "14-05-1988", "Yes"});
-        // model.addRow(new Object[]{"102", "Nurse", "Marcus", "Vance", "22-09-1992", "Yes"});
-        // model.addRow(new Object[]{"103", "Administrator", "Elena", "Rostova", "03-11-1985", "No"});
+        // Quick mock rows for testing
+        //model.addRow(new Object[]{"101", "Doctor", "Sarah", "Jenkins", "14-05-1988", "Yes"});
+        //model.addRow(new Object[]{"102", "Nurse", "Marcus", "Vance", "22-09-1992", "Yes"});
+        //model.addRow(new Object[]{"103", "Administrator", "Elena", "Rostova", "03-11-1985", "No"});
 
         searchAndTablePanel.add(searchInputs, BorderLayout.NORTH);
         searchAndTablePanel.add(new JScrollPane(table), BorderLayout.CENTER);
@@ -157,6 +159,18 @@ public class AdminDashBoardScreen extends JFrame {
         offBoardButton.setEnabled(false);
         offBoardButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
         optionsButtonPanel.add(offBoardButton);
+
+        // Grants remote access
+        grantRemoteAccessButton = new JButton("Grant Remote");
+        grantRemoteAccessButton.setEnabled(false);
+        grantRemoteAccessButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        optionsButtonPanel.add(grantRemoteAccessButton);
+
+        //Removes remote access
+        revokeRemoteAccessButton = new JButton("Revoke Remote");
+        revokeRemoteAccessButton.setEnabled(false);
+        revokeRemoteAccessButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        optionsButtonPanel.add(revokeRemoteAccessButton);
 
         // View record button
         viewRecordButton = new JButton("View");
@@ -216,6 +230,8 @@ public class AdminDashBoardScreen extends JFrame {
                 }
 
                 // Enable/Disable buttons based on selection status
+                grantRemoteAccessButton.setEnabled(hasSelection);
+                revokeRemoteAccessButton.setEnabled(hasSelection);
                 viewRecordButton.setEnabled(hasSelection);
                 editRecordButton.setEnabled(hasSelection);
                 offBoardButton.setEnabled(hasSelection);
@@ -263,6 +279,22 @@ public class AdminDashBoardScreen extends JFrame {
         // Opens remove staff screen
         offBoardButton.addActionListener(e -> {
             SwingUtilities.invokeLater(() -> new OffBoardStaffScreen(selectedStaffId).setVisible(true));
+        });
+
+        // Opens grant remote screen
+        grantRemoteAccessButton.addActionListener(e -> {
+            if (selectedStaffId != null) {
+                GrantRemoteAccessScreen remoteAccessScreen = new GrantRemoteAccessScreen(selectedStaffId);
+                remoteAccessScreen.setVisible(true);
+            }
+        });
+
+        // Opens revoke remote screen
+        revokeRemoteAccessButton.addActionListener(e -> {
+            if (selectedStaffId != null) {
+                RevokeRemoteAccessScreen revokeScreen = new RevokeRemoteAccessScreen(selectedStaffId);
+                revokeScreen.setVisible(true);
+            }
         });
 
         // Opens View mode
