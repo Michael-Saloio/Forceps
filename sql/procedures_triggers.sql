@@ -820,18 +820,51 @@ CREATE PROCEDURE offboard_employee (
     IN param_termination_reason VARCHAR(500)
 )
 BEGIN
+    DECLARE existing_termination_date DATE DEFAULT NULL;
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    IF param_staff_id IS NULL OR param_staff_id <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'A valid staff ID is required.';
+    END IF;
+    IF param_termination_date IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'A termination date is required.';
+    END IF;
+    IF param_termination_reason IS NULL OR CHAR_LENGTH(TRIM(param_termination_reason)) = 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'A termination reason is required.';
+    END IF;
 
     START TRANSACTION;
+
+    SELECT termination_date INTO existing_termination_date
+    FROM Staff
+    WHERE staff_id = param_staff_id
+    FOR UPDATE;
+
+    IF existing_termination_date IS NOT NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'This staff member is already offboarded.';
+    END IF;
 
     UPDATE Staff
     SET termination_date = param_termination_date,
         termination_reason = param_termination_reason
     WHERE staff_id = param_staff_id;
 
+    IF ROW_COUNT() <> 1 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Staff member was not found.';
+    END IF;
+
     UPDATE User_account
     SET account_status = 'INACTIVE',
         updated_at = CURRENT_TIMESTAMP
     WHERE staff_id = param_staff_id;
+
+    UPDATE Remote_access
+    SET revoked_at = CURRENT_TIMESTAMP
+    WHERE staff_id = param_staff_id AND revoked_at IS NULL;
 
     COMMIT;
 

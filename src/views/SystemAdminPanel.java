@@ -128,7 +128,7 @@ public class SystemAdminPanel extends JPanel {
         panel.add(controls, BorderLayout.NORTH); panel.add(new JScrollPane(staffTable), BorderLayout.CENTER);
         find.addActionListener(e -> searchStaff(search.getText().trim()));
         search.addActionListener(e -> searchStaff(search.getText().trim()));
-        offboard.addActionListener(e -> offboardSelected());
+        offboard.addActionListener(e -> handleSubmit());
         return panel;
     }
 
@@ -149,7 +149,7 @@ public class SystemAdminPanel extends JPanel {
         } catch (SQLException ex) { showError(ex); }
     }
 
-    private void offboardSelected() {
+    private void handleSubmit() {
         int selected = staffTable.getSelectedRow();
         if (selected < 0) { showMessage("Select an employee first."); return; }
         int row = staffTable.convertRowIndexToModel(selected);
@@ -157,12 +157,14 @@ public class SystemAdminPanel extends JPanel {
         String name = String.valueOf(staffModel.getValueAt(row, 2));
         JTextArea reason = new JTextArea(4, 32);
         if (JOptionPane.showConfirmDialog(this, new JScrollPane(reason), "Reason for offboarding " + name, JOptionPane.OK_CANCEL_OPTION) != JOptionPane.OK_OPTION) return;
-        if (reason.getText().trim().isEmpty()) { showMessage("A termination reason is required."); return; }
+        String terminationReason = reason.getText().trim();
+        if (terminationReason.isEmpty()) { showMessage("A termination reason is required."); return; }
+        if (terminationReason.length() > 500) { showMessage("The termination reason must be 500 characters or fewer."); return; }
         try (Connection c = DatabaseConnection.getConnection(); CallableStatement q = c.prepareCall("{CALL offboard_employee(?, ?, ?)}")) {
-            q.setLong(1, staffId); q.setDate(2, Date.valueOf(LocalDate.now())); q.setString(3, reason.getText().trim());
+            q.setLong(1, staffId); q.setDate(2, Date.valueOf(LocalDate.now())); q.setString(3, terminationReason);
             q.execute();
             showMessage(name + " was offboarded. The staff and account history were retained.");
-            searchStaff(name);
+            searchStaff(Long.toString(staffId));
         } catch (SQLException ex) { showError(ex); }
     }
 
