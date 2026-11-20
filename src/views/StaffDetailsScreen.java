@@ -86,13 +86,13 @@ public class StaffDetailsScreen extends JFrame {
         JPanel formPanel = new JPanel(new GridLayout(0, 2, 10, 10));
         formPanel.setBorder(BorderFactory.createTitledBorder("Staff Member Details"));
 
-        //Staff Id
+        // Staff Id
         staffIdField = new JTextField(10);
         formPanel.add(new JLabel("Staff ID:"));
         formPanel.add(staffIdField);
 
         // Role Dropdown
-        String[] roles = {"Administrator", "Doctor", "Nurse"};
+        String[] roles = { "Administrator", "Doctor", "Nurse" };
         roleBox = new JComboBox<>(roles);
         formPanel.add(new JLabel("Role:"));
         formPanel.add(roleBox);
@@ -150,7 +150,7 @@ public class StaffDetailsScreen extends JFrame {
         activeButton.setSelected(true);
 
         // South Panel to hold radio buttons seperate from FormPanel
-        // Corrects the boundaries from the coloumn constraints BY FromPanel 
+        // Corrects the boundaries from the coloumn constraints BY FromPanel
         JPanel statusPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         statusPanel.add(activeButton);
         statusPanel.add(inActiveButton);
@@ -188,7 +188,7 @@ public class StaffDetailsScreen extends JFrame {
         if (mode == FormMode.ADD) {
             submitButton.setText("Create");
             setFieldsEditable(true);
-            
+
         } else {
             staffIdField.setText(staffId);
             staffIdField.setEditable(false); // Primary key should not changed for existing accounts
@@ -199,14 +199,14 @@ public class StaffDetailsScreen extends JFrame {
                 // Locks down all fields for view-only mode
             } else if (mode == FormMode.VIEW) {
                 setFieldsEditable(false);
-                submitButton.setVisible(false); 
+                submitButton.setVisible(false);
                 cancelButton.setText("Close");
             }
         }
     }
 
     private void setFieldsEditable(boolean editable) {
-        staffIdField.setEditable(editable); 
+        staffIdField.setEditable(editable);
         roleBox.setEnabled(editable);
         firstNameField.setEditable(editable);
         lastNameField.setEditable(editable);
@@ -241,41 +241,41 @@ public class StaffDetailsScreen extends JFrame {
             hireDateField.setBackground(backgroundBg);
             if (terminationDateField != null) {
                 terminationDateField.setBackground(backgroundBg);
-            } 
+            }
 
         } else {
-        // RESTORES default cosmestics for accoutn details under ADD / EDIT modes
-        staffIdField.setBorder(UIManager.getBorder("TextField.border"));
-        firstNameField.setBorder(UIManager.getBorder("TextField.border"));
-        lastNameField.setBorder(UIManager.getBorder("TextField.border"));
-        phoneField.setBorder(UIManager.getBorder("TextField.border"));
-        emailField.setBorder(UIManager.getBorder("TextField.border"));
-        hireDateField.setBorder(UIManager.getBorder("TextField.border"));
-        if (terminationDateField != null) {
-            terminationDateField.setBorder(UIManager.getBorder("TextField.border"));
-        }
+            // RESTORES default cosmestics for accoutn details under ADD / EDIT modes
+            staffIdField.setBorder(UIManager.getBorder("TextField.border"));
+            firstNameField.setBorder(UIManager.getBorder("TextField.border"));
+            lastNameField.setBorder(UIManager.getBorder("TextField.border"));
+            phoneField.setBorder(UIManager.getBorder("TextField.border"));
+            emailField.setBorder(UIManager.getBorder("TextField.border"));
+            hireDateField.setBorder(UIManager.getBorder("TextField.border"));
+            if (terminationDateField != null) {
+                terminationDateField.setBorder(UIManager.getBorder("TextField.border"));
+            }
 
-        staffIdField.setBackground(Color.WHITE);
-        firstNameField.setBackground(Color.WHITE);
-        lastNameField.setBackground(Color.WHITE);
-        phoneField.setBackground(Color.WHITE);
-        emailField.setBackground(Color.WHITE);
-        hireDateField.setBackground(Color.WHITE);
-        if (terminationDateField != null) {
-            terminationDateField.setBackground(Color.WHITE);
+            staffIdField.setBackground(Color.WHITE);
+            firstNameField.setBackground(Color.WHITE);
+            lastNameField.setBackground(Color.WHITE);
+            phoneField.setBackground(Color.WHITE);
+            emailField.setBackground(Color.WHITE);
+            hireDateField.setBackground(Color.WHITE);
+            if (terminationDateField != null) {
+                terminationDateField.setBackground(Color.WHITE);
+            }
         }
     }
-}
 
     // Validates account detail inputs by checking to see if each field was filled
     private boolean validateInputs() {
-        if (mode == FormMode.ADD 
-            && staffIdField.getText().trim().isEmpty() 
-            || firstNameField.getText().trim().isEmpty() 
-            || lastNameField.getText().trim().isEmpty()
-            || phoneField.getText().contains("_")
-            || emailField.getText().trim().isEmpty()
-            || hireDateField.getText().trim().contains("_")) {
+        if (mode == FormMode.ADD
+                && staffIdField.getText().trim().isEmpty()
+                || firstNameField.getText().trim().isEmpty()
+                || lastNameField.getText().trim().isEmpty()
+                || phoneField.getText().contains("_")
+                || emailField.getText().trim().isEmpty()
+                || hireDateField.getText().trim().contains("_")) {
             JOptionPane.showMessageDialog(this, "Please fill in the form in its entirety before submitting.");
             return false;
         }
@@ -284,18 +284,19 @@ public class StaffDetailsScreen extends JFrame {
 
     // Handles the logic behind the ADD and EDIT modes of user accounts, including
     // minor email validation and final feedback to the user
-    // TO DO: DATABASE LOGIC NEEDED HERE //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // TO DO: DATABASE LOGIC NEEDED HERE
+    // //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     private void handleSubmit() {
         if (!validateInputs()) {
             return;
-        } 
+        }
 
         if (!emailField.getText().contains("@")) {
             JOptionPane.showMessageDialog(this, "Email must contain an '@' and domain.");
             emailField.requestFocus();
-            return; 
+            return;
         }
-           
+
         String enteredStaffId = staffIdField.getText().trim();
         String role = (String) roleBox.getSelectedItem();
         String firstName = firstNameField.getText().trim();
