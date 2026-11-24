@@ -1,6 +1,7 @@
 package views;
 
 import database.DatabaseConnection;
+import database.AuditLogger;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.print.*;
@@ -11,9 +12,15 @@ import java.util.Map;
 
 /** Reception patient registration plus printable Code 39 patient-ID labels. */
 public class PatientRegistrationPanel extends JPanel {
+    private final long receptionistStaffId;
     private final JTextField barcodePatientId = new JTextField(12);
 
     public PatientRegistrationPanel() {
+        this(0);
+    }
+
+    public PatientRegistrationPanel(long receptionistStaffId) {
+        this.receptionistStaffId = receptionistStaffId;
         setLayout(new GridBagLayout());
         JPanel content = new JPanel(new GridLayout(0, 1, 12, 12));
         content.setBorder(BorderFactory.createEmptyBorder(24, 32, 24, 32));
@@ -70,6 +77,7 @@ public class PatientRegistrationPanel extends JPanel {
                     if (!r.next()) throw new SQLException("MySQL did not return the new patient ID.");
                     patientId = r.getLong(1);
                 }
+                if (receptionistStaffId > 0) AuditLogger.logBestEffort(c, receptionistStaffId, patientId, "PATIENT_REGISTERED", "PATIENT", Long.toString(patientId), "SUCCESS", "Patient registered.");
             }
             barcodePatientId.setText(Long.toString(patientId));
             showMessage("Patient registered with ID " + patientId + ". After booking and checking in an appointment, the app will offer to print the wristband barcode.");
@@ -91,6 +99,7 @@ public class PatientRegistrationPanel extends JPanel {
                 try (ResultSet r = q.executeQuery()) {
                     if (!r.next()) { showMessage("No checked-in patient found for ID " + id + ". A wristband barcode is available after check-in."); return; }
                 }
+                if (receptionistStaffId > 0) AuditLogger.logBestEffort(c, receptionistStaffId, id, "BARCODE_REPRINTED", "PATIENT", Long.toString(id), "SUCCESS", "Patient-ID barcode reprinted.");
             }
             showBarcode(id);
         } catch (NumberFormatException ex) {

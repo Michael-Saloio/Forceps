@@ -672,6 +672,66 @@ BEGIN
         "CHECKED IN" -- can be updated to checked out in java file
     );
 
+    UPDATE Appointment SET appt_status = 'CHECKED IN' WHERE appt_id = param_appt_id;
+
+END//
+
+DELIMITER ;
+
+DELIMITER //
+
+-- Register a prospective patient and check them in atomically at their first visit.
+DROP PROCEDURE IF EXISTS register_and_check_in_prospective//
+CREATE PROCEDURE register_and_check_in_prospective(
+    IN p_appt_id BIGINT,
+    IN p_checked_in_by_staff_id BIGINT,
+    OUT p_patient_id BIGINT,
+    OUT p_visit_id BIGINT
+)
+BEGIN
+    DECLARE v_first VARCHAR(100);
+    DECLARE v_last VARCHAR(100);
+    DECLARE v_dob DATE;
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION BEGIN ROLLBACK; RESIGNAL; END;
+
+    START TRANSACTION;
+    SELECT prospective_first_name, prospective_last_name, prospective_dob
+      INTO v_first, v_last, v_dob
+      FROM Appointment
+     WHERE appt_id=p_appt_id AND patient_id IS NULL AND appt_status IN ('SCHEDULED','BOOKED')
+     FOR UPDATE;
+    IF v_first IS NULL OR v_last IS NULL OR v_dob IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Appointment is not an eligible prospective-patient booking.';
+    END IF;
+    IF EXISTS (SELECT 1 FROM Visit WHERE appt_id=p_appt_id) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='A visit is already recorded for this appointment.';
+    END IF;
+
+    INSERT INTO Patient(first_name,last_name,date_of_birth,created_at)
+    VALUES(v_first,v_last,v_dob,CURRENT_TIMESTAMP);
+    SET p_patient_id=LAST_INSERT_ID();
+    UPDATE Appointment SET patient_id=p_patient_id, prospective_first_name=NULL,
+        prospective_last_name=NULL, prospective_dob=NULL, appt_status='CHECKED IN'
+     WHERE appt_id=p_appt_id;
+    INSERT INTO Visit(appt_id,checked_in_by_staff_id,check_in_at,visit_status)
+    VALUES(p_appt_id,p_checked_in_by_staff_id,CURRENT_TIMESTAMP,'CHECKED IN');
+    SET p_visit_id=LAST_INSERT_ID();
+    COMMIT;
+END//
+
+DELIMITER ;
+
+DELIMITER //
+
+DROP PROCEDURE IF EXISTS mark_appointment_no_show//
+CREATE PROCEDURE mark_appointment_no_show(IN p_appt_id BIGINT)
+BEGIN
+    UPDATE Appointment SET appt_status='NO_SHOW'
+     WHERE appt_id=p_appt_id AND appt_status IN ('SCHEDULED','BOOKED')
+       AND NOT EXISTS (SELECT 1 FROM Visit WHERE Visit.appt_id=Appointment.appt_id);
+    IF ROW_COUNT()=0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Appointment cannot be marked no-show.';
+    END IF;
 END//
 
 DELIMITER ;
@@ -916,7 +976,7 @@ BEGIN
     END IF;
 
     UPDATE User_account
-    SET account_status = 'INACTIVE',
+    SET account_status = 'DEACTIVATED',
         updated_at = CURRENT_TIMESTAMP
     WHERE staff_id = param_staff_id;
 
@@ -926,6 +986,39 @@ BEGIN
 
     COMMIT;
 
+END//
+
+DELIMITER ;
+
+DELIMITER //
+
+DROP PROCEDURE IF EXISTS update_user_account_access//
+CREATE PROCEDURE update_user_account_access(
+    IN p_account_id BIGINT,
+    IN p_actor_staff_id BIGINT,
+    IN p_new_status VARCHAR(30),
+    IN p_new_password_hash VARCHAR(255)
+)
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM Staff s JOIN Role r ON r.role_id=s.role_id
+        WHERE s.staff_id=p_actor_staff_id AND r.role_name='System Administrator' AND s.termination_date IS NULL) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Only an active System Administrator can manage accounts.';
+    END IF;
+    IF p_new_status NOT IN ('ACTIVE','DEACTIVATED') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Account status must be ACTIVE or DEACTIVATED.';
+    END IF;
+    IF p_new_status='ACTIVE' AND EXISTS(
+        SELECT 1 FROM User_account ua JOIN Staff s ON s.staff_id=ua.staff_id
+        WHERE ua.account_id=p_account_id AND s.termination_date IS NOT NULL
+    ) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='A terminated employee account cannot be activated.';
+    END IF;
+    UPDATE User_account SET account_status=p_new_status,
+        password_hash=COALESCE(p_new_password_hash,password_hash), updated_at=CURRENT_TIMESTAMP
+    WHERE account_id=p_account_id;
+    IF ROW_COUNT()=0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='User account was not found.';
+    END IF;
 END//
 
 DELIMITER ;

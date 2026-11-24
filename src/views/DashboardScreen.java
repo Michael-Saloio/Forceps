@@ -60,6 +60,8 @@ public class DashboardScreen extends JFrame {
             addAdminNav(menu, "Offboard Staff", "Offboard");
             addAdminNav(menu, "Grant Remote Access", "Grant remote access");
             addAdminNav(menu, "Revoke Remote Access", "Revoke remote access");
+            addAdminNav(menu, "Manage Accounts", "Manage accounts");
+            addAdminNav(menu, "Audit Trail", "Audit trail");
         }
         if (remotePanel != null) addNav(menu, "Granted Patient Records", "Remote Access");
 
@@ -71,7 +73,7 @@ public class DashboardScreen extends JFrame {
         if (isClinicalRole()) recordsPanel = new MedicalRecordsPanel(staffId, role);
         if (isReceptionist()) {
             billingPanel = new BillingPanel(staffId);
-            patientPanel = new PatientRegistrationPanel();
+            patientPanel = new PatientRegistrationPanel(staffId);
         }
         if (isClinicalRole()) appointmentsPanel = new AppointmentsPanel(role, staffId);
         else if (isReceptionist()) appointmentsPanel = new AppointmentsPanel(role, staffId, patientPanel::showBarcodeForPatient);
@@ -120,6 +122,8 @@ public class DashboardScreen extends JFrame {
             addAdminAction(actions, "Offboard", "Offboard");
             addAdminAction(actions, "Grant Remote Access", "Grant remote access");
             addAdminAction(actions, "Revoke Remote Access", "Revoke remote access");
+            addAdminAction(actions, "Manage Accounts", "Manage accounts");
+            addAdminAction(actions, "Audit Trail", "Audit trail");
         } else if (role.equalsIgnoreCase("Remote Worker")) {
             addAction(actions, "Patient Record Access", "Remote Access");
         } else {

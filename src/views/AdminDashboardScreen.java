@@ -1,5 +1,6 @@
 package views;
 
+import database.DatabaseConnection;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 
@@ -12,6 +13,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.ArrayList;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 
 public class AdminDashboardScreen extends JFrame {
 
@@ -287,17 +290,62 @@ public class AdminDashboardScreen extends JFrame {
             if (selectedStaffId != null) new RevokeRemoteAccessScreen(selectedStaffId).setVisible(true);
         });
 
-        // Future feature to be implemented, currently a placeholder
-        exportButton.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this, "This feature is a work in progress.", "Export Data",
-                    JOptionPane.WARNING_MESSAGE);
-        });
+        exportButton.addActionListener(e -> exportSearchResults());
+        settingsButton.addActionListener(e -> showConnectionSettings());
+    }
 
-        // Future feature to be implemented, currently a placeholder
-        settingsButton.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this, "This feature is a work in progress.", "Settings",
-                    JOptionPane.WARNING_MESSAGE);
-        });
+    private void exportSearchResults() {
+        if (model.getRowCount() == 0) {
+            JOptionPane.showMessageDialog(this, "Search for staff records before exporting.");
+            return;
+        }
+        JFileChooser chooser = new JFileChooser();
+        chooser.setSelectedFile(new java.io.File("forceps-staff.csv"));
+        if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
+        java.io.File file = chooser.getSelectedFile();
+        try (java.io.BufferedWriter writer = Files.newBufferedWriter(file.toPath(), StandardCharsets.UTF_8)) {
+            for (int col = 0; col < model.getColumnCount(); col++) {
+                if (col > 0) writer.write(',');
+                writer.write(csv(String.valueOf(model.getColumnName(col))));
+            }
+            writer.newLine();
+            for (int row = 0; row < model.getRowCount(); row++) {
+                for (int col = 0; col < model.getColumnCount(); col++) {
+                    if (col > 0) writer.write(',');
+                    Object value = model.getValueAt(row, col);
+                    writer.write(csv(value == null ? "" : value.toString()));
+                }
+                writer.newLine();
+            }
+            JOptionPane.showMessageDialog(this, "Exported " + model.getRowCount() + " staff records to " + file.getAbsolutePath());
+        } catch (java.io.IOException ex) {
+            JOptionPane.showMessageDialog(this, "Export failed: " + ex.getMessage(), "Export Data", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private String csv(String value) { return "\"" + value.replace("\"", "\"\"") + "\""; }
+
+    private void showConnectionSettings() {
+        String url = setting("FORCEPS_DB_URL", "jdbc:mysql://localhost:3306/forceps");
+        String user = setting("FORCEPS_DB_USER", "root");
+        JTextField urlField = new JTextField(url, 34); urlField.setEditable(false);
+        JTextField userField = new JTextField(user, 18); userField.setEditable(false);
+        JPanel panel = new JPanel(new GridLayout(0, 2, 6, 6));
+        panel.add(new JLabel("Database URL")); panel.add(urlField);
+        panel.add(new JLabel("Database user")); panel.add(userField);
+        panel.add(new JLabel("Password")); panel.add(new JLabel("Stored in FORCEPS_DB_PASSWORD; hidden"));
+        int choice = JOptionPane.showConfirmDialog(this, panel, "Database Settings", JOptionPane.OK_CANCEL_OPTION, JOptionPane.INFORMATION_MESSAGE);
+        if (choice != JOptionPane.OK_OPTION) return;
+        try (Connection connection = DatabaseConnection.getConnection()) {
+            JOptionPane.showMessageDialog(this, "Database connection succeeded.", "Database Settings", JOptionPane.INFORMATION_MESSAGE);
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this, "Database connection failed: " + ex.getMessage(), "Database Settings", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private String setting(String key, String fallback) {
+        String value = System.getenv(key);
+        return value == null || value.isBlank() ? fallback : value;
     }
 
     // Validates search criteria by checkign to see if at least one input was given

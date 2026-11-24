@@ -1,6 +1,7 @@
 package views;
 
 import database.DatabaseConnection;
+import database.AuditLogger;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
@@ -21,6 +22,8 @@ public class SystemAdminPanel extends JPanel {
     private final JTable staffTable = new JTable(staffModel);
     private final DefaultTableModel accessModel = nonEditableModel("Access ID", "Remote worker", "Patient", "Expires");
     private final JTable accessTable = new JTable(accessModel);
+    private final DefaultTableModel accountModel = nonEditableModel("Account ID", "Staff ID", "Name", "Role", "Status");
+    private final JTable accountTable = new JTable(accountModel);
     private JComboBox<StaffOption> workerChoice;
     private JComboBox<PatientOption> patientChoice;
     private JTextField expiryField;
@@ -32,7 +35,76 @@ public class SystemAdminPanel extends JPanel {
         tabs.addTab("Offboard", offboardingPanel());
         tabs.addTab("Grant remote access", grantPanel());
         tabs.addTab("Revoke remote access", revocationPanel());
+        tabs.addTab("Manage accounts", accountPanel());
+        tabs.addTab("Audit trail", new AuditTrailPanel());
         add(tabs, BorderLayout.CENTER);
+    }
+
+    private JPanel accountPanel() {
+        JPanel panel = new JPanel(new BorderLayout(6, 6));
+        JPanel controls = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JButton refresh = new JButton("Refresh accounts");
+        JButton reset = new JButton("Set temporary password");
+        JButton status = new JButton("Activate / deactivate");
+        controls.add(refresh); controls.add(reset); controls.add(status);
+        accountTable.setAutoCreateRowSorter(true); accountTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        panel.add(controls, BorderLayout.NORTH); panel.add(new JScrollPane(accountTable), BorderLayout.CENTER);
+        refresh.addActionListener(e -> loadAccounts());
+        reset.addActionListener(e -> resetSelectedAccountPassword());
+        status.addActionListener(e -> toggleSelectedAccount());
+        loadAccounts();
+        return panel;
+    }
+
+    private void loadAccounts() {
+        accountModel.setRowCount(0);
+        String sql = "SELECT ua.account_id,s.staff_id,CONCAT(s.first_name,' ',s.last_name) AS staff_name,r.role_name,ua.account_status " +
+                "FROM User_account ua JOIN Staff s ON s.staff_id=ua.staff_id JOIN Role r ON r.role_id=s.role_id ORDER BY s.last_name,s.first_name";
+        try (Connection c=DatabaseConnection.getConnection(); Statement q=c.createStatement(); ResultSet r=q.executeQuery(sql)) {
+            while(r.next()) accountModel.addRow(new Object[]{r.getLong("account_id"),r.getLong("staff_id"),r.getString("staff_name"),r.getString("role_name"),r.getString("account_status")});
+        } catch(SQLException ex) { showError(ex); }
+    }
+
+    private int selectedAccountRow() {
+        int view=accountTable.getSelectedRow();
+        return view<0 ? -1 : accountTable.convertRowIndexToModel(view);
+    }
+
+    private void resetSelectedAccountPassword() {
+        int row=selectedAccountRow();
+        if(row<0){showMessage("Select an account first.");return;}
+        JPasswordField first=new JPasswordField(18),confirm=new JPasswordField(18);
+        JPanel form=new JPanel(new GridLayout(0,2,5,5));
+        form.add(new JLabel("New temporary password"));form.add(first);
+        form.add(new JLabel("Confirm password"));form.add(confirm);
+        if(JOptionPane.showConfirmDialog(this,form,"Set temporary password",JOptionPane.OK_CANCEL_OPTION)!=JOptionPane.OK_OPTION)return;
+        char[] a=first.getPassword(),b=confirm.getPassword();
+        try {
+            if(a.length<8 || !java.util.Arrays.equals(a,b)){showMessage("Use at least 8 characters and enter the same password twice.");return;}
+            String hash=hash(new String(a));
+            long account=((Number)accountModel.getValueAt(row,0)).longValue();
+            String current=String.valueOf(accountModel.getValueAt(row,4));
+            try(Connection c=DatabaseConnection.getConnection();CallableStatement q=c.prepareCall("{CALL update_user_account_access(?, ?, ?, ?)}")){
+                q.setLong(1,account);q.setLong(2,administratorStaffId);q.setString(3,current);q.setString(4,hash);q.execute();
+                AuditLogger.logBestEffort(c,administratorStaffId,null,"ACCOUNT_PASSWORD_RESET","USER_ACCOUNT",Long.toString(account),"SUCCESS","Administrator set a temporary password.");
+            }
+            showMessage("Temporary password updated. Share it with the employee securely.");
+        } catch(SQLException ex){showError(ex);} finally {java.util.Arrays.fill(a,'\0');java.util.Arrays.fill(b,'\0');}
+    }
+
+    private void toggleSelectedAccount() {
+        int row=selectedAccountRow();
+        if(row<0){showMessage("Select an account first.");return;}
+        long account=((Number)accountModel.getValueAt(row,0)).longValue();
+        String current=String.valueOf(accountModel.getValueAt(row,4));
+        String next="ACTIVE".equalsIgnoreCase(current)?"DEACTIVATED":"ACTIVE";
+        int confirm=JOptionPane.showConfirmDialog(this,"Set account "+account+" to "+next+"?","Confirm account change",JOptionPane.OK_CANCEL_OPTION);
+        if(confirm!=JOptionPane.OK_OPTION)return;
+        try(Connection c=DatabaseConnection.getConnection();CallableStatement q=c.prepareCall("{CALL update_user_account_access(?, ?, ?, ?)}")){
+            q.setLong(1,account);q.setLong(2,administratorStaffId);q.setString(3,next);q.setNull(4,Types.VARCHAR);q.execute();
+            AuditLogger.logBestEffort(c,administratorStaffId,null,"ACCOUNT_STATUS_CHANGED","USER_ACCOUNT",Long.toString(account),"SUCCESS","Account status changed to "+next+".");
+            loadAccounts();showMessage("Account status updated.");
+        }catch(SQLException ex){showError(ex);}
     }
 
     public void showTab(String name) {
@@ -109,6 +181,7 @@ public class SystemAdminPanel extends JPanel {
                     find.setString(1, email.getText().trim());
                     try (ResultSet r = find.executeQuery()) { if (!r.next()) throw new SQLException("Created staff member could not be found."); id = r.getLong(1); }
                 }
+                AuditLogger.logBestEffort(c, administratorStaffId, null, "STAFF_ONBOARDED", "STAFF", Long.toString(id), "SUCCESS", "Staff account created for role " + role + ".");
                 showMessage(role + " account created. Staff ID: " + id + ". Share the temporary password securely.");
                 password.setText("");
             }
@@ -163,6 +236,7 @@ public class SystemAdminPanel extends JPanel {
         try (Connection c = DatabaseConnection.getConnection(); CallableStatement q = c.prepareCall("{CALL offboard_employee(?, ?, ?)}")) {
             q.setLong(1, staffId); q.setDate(2, Date.valueOf(LocalDate.now())); q.setString(3, terminationReason);
             q.execute();
+            AuditLogger.logBestEffort(c, administratorStaffId, null, "STAFF_OFFBOARDED", "STAFF", Long.toString(staffId), "SUCCESS", "Staff account deactivated and active remote grants revoked.");
             showMessage(name + " was offboarded. The staff and account history were retained.");
             searchStaff(Long.toString(staffId));
         } catch (SQLException ex) { showError(ex); }
@@ -217,6 +291,7 @@ public class SystemAdminPanel extends JPanel {
                     if (!r.next()) throw new SQLException("MySQL did not return the access ID.");
                     accessId = r.getLong(1);
                 }
+                AuditLogger.logBestEffort(c, administratorStaffId, patient.id, "REMOTE_ACCESS_GRANTED", "REMOTE_ACCESS", Long.toString(accessId), "SUCCESS", "Time-limited single-use patient access grant created.");
                 JOptionPane.showMessageDialog(this, "Remote access granted. Give the worker these values securely:\nAccess ID: " + accessId + "\nAccess code: " + code + "\nThe code is shown once.");
             }
         } catch (DateTimeParseException ex) {
@@ -254,7 +329,9 @@ public class SystemAdminPanel extends JPanel {
         long id = ((Number) accessModel.getValueAt(row, 0)).longValue();
         if (JOptionPane.showConfirmDialog(this, "Revoke access " + id + "?", "Confirm revocation", JOptionPane.OK_CANCEL_OPTION) != JOptionPane.OK_OPTION) return;
         try (Connection c = DatabaseConnection.getConnection(); CallableStatement q = c.prepareCall("{CALL revoke_remote_access(?)}")) {
-            q.setLong(1, id); q.execute(); loadAccessGrants(); showMessage("Remote access revoked.");
+            q.setLong(1, id); q.execute();
+            AuditLogger.logBestEffort(c, administratorStaffId, null, "REMOTE_ACCESS_REVOKED", "REMOTE_ACCESS", Long.toString(id), "SUCCESS", "Remote patient access grant revoked.");
+            loadAccessGrants(); showMessage("Remote access revoked.");
         } catch (SQLException ex) { showError(ex); }
     }
 

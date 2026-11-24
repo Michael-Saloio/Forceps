@@ -1,6 +1,7 @@
 package views;
 
 import database.DatabaseConnection;
+import database.AuditLogger;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
@@ -13,6 +14,7 @@ public class MedicalRecordsPanel extends JPanel {
     private final long clinicianStaffId;
     private final String role;
     private final JTextField patientId = new JTextField(12);
+    private final JLabel patientSummary = new JLabel("No patient selected");
     private final DefaultTableModel records = model(
             "Record", "Patient", "Visit time", "Clinician", "Height cm", "Weight kg", "Vitals", "Diagnosis", "Treatment", "Clinical notes");
     private final DefaultTableModel appointments = model(
@@ -37,6 +39,7 @@ public class MedicalRecordsPanel extends JPanel {
         controls.add(search);
         controls.add(add);
         controls.add(edit);
+        controls.add(patientSummary);
         add(controls, BorderLayout.NORTH);
 
         configureTable(recordsTable);
@@ -73,6 +76,7 @@ public class MedicalRecordsPanel extends JPanel {
     private void loadPatientChart() {
         records.setRowCount(0);
         appointments.setRowCount(0);
+        patientSummary.setText("No patient selected");
         String id = normalizeBarcode(patientId.getText());
         if (!validId(id)) return;
         patientId.setText(id);
@@ -81,8 +85,16 @@ public class MedicalRecordsPanel extends JPanel {
                 showMessage("No patient found for ID/barcode " + id + ".");
                 return;
             }
+            try (PreparedStatement q = c.prepareStatement("SELECT first_name,last_name,date_of_birth,phone FROM Patient WHERE patient_id=?")) {
+                q.setLong(1, Long.parseLong(id));
+                try (ResultSet r = q.executeQuery()) {
+                    if (r.next()) patientSummary.setText("Patient: " + r.getString("first_name") + " " + r.getString("last_name")
+                            + " | DOB: " + r.getDate("date_of_birth") + " | Phone: " + java.util.Objects.toString(r.getString("phone"), "—"));
+                }
+            }
             loadRecords(c, Long.parseLong(id));
             loadAppointments(c, Long.parseLong(id));
+            AuditLogger.logBestEffort(c, clinicianStaffId, Long.parseLong(id), "PATIENT_CHART_VIEWED", "PATIENT", id, "SUCCESS", "Patient chart opened.");
             if (records.getRowCount() == 0 && appointments.getRowCount() == 0) {
                 showMessage("No records or appointments found for this patient.");
             }
@@ -174,6 +186,7 @@ public class MedicalRecordsPanel extends JPanel {
                 q.setString(8, emptyToNull(String.valueOf(treatment.getEditor().getItem())));
                 q.setString(9, emptyToNull(notes.getText()));
                 q.executeUpdate();
+                AuditLogger.logBestEffort(c, clinicianStaffId, patientValue, "MEDICAL_RECORD_CREATED", "PATIENT", patientKey, "SUCCESS", "Clinical record created.");
             }
             loadPatientChart();
             showMessage("Patient record saved.");
@@ -219,6 +232,7 @@ public class MedicalRecordsPanel extends JPanel {
                 q.setString(6, emptyToNull(treatment.getText()));
                 q.setString(7, emptyToNull(notes.getText()));
                 if (q.executeUpdate() == 0) { showMessage("Record no longer exists."); return; }
+                AuditLogger.logBestEffort(c, clinicianStaffId, null, "MEDICAL_RECORD_UPDATED", "MEDICAL_RECORD", Long.toString(recordId), "SUCCESS", "Clinical record updated.");
             }
             loadPatientChart();
             showMessage("Patient record updated.");

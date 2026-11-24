@@ -2,6 +2,7 @@ package views;
 
 // THESE ARE FOR CONNECTION 
 import database.DatabaseConnection;
+import database.AuditLogger;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -143,7 +144,6 @@ public class LoginScreen extends JFrame {
     }
 
     // Sets up listeners for user interactions with the login screen components
-    // TO DO: Implement "forgot your password" functionality in the future
     private void setupListeners() {
         userIdField.addFocusListener(new java.awt.event.FocusAdapter() {
             @Override
@@ -194,10 +194,10 @@ public class LoginScreen extends JFrame {
             }
         });
 
-        // Future feature to be implemented, currently a placeholder
         forgotPasswordButton.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this, "This feature is a work in progress.", "Forgot Password",
-                    JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(this,
+                    "Contact a System Administrator to set a temporary password. They can use Manage accounts after signing in.",
+                    "Password help", JOptionPane.INFORMATION_MESSAGE);
         });
     }
 
@@ -276,6 +276,8 @@ public class LoginScreen extends JFrame {
                 long staffId = rs.getLong("staff_id");
                 // Compare the stored hash with the hash of the entered password
                 if (storedPassword.equals(hashedEnteredPassword)) {
+
+                    AuditLogger.logBestEffort(staffId, null, "LOGIN_SUCCEEDED", "USER_ACCOUNT", Long.toString(userId), "SUCCESS", "Staff login succeeded.");
 
                     JOptionPane.showMessageDialog(
                             this,

@@ -7,7 +7,8 @@ Run these scripts once, in order, from MySQL Workbench or the MySQL command-line
 1. `sql/schema.sql`
 2. `sql/procedures_triggers.sql`
 3. `sql/medical_billing_procedures.sql`
-4. `sql/seed_data.sql`
+4. `sql/audit_log_migration.sql`
+5. `sql/seed_data.sql`
 
 The seed script creates demo staff, patients, assigned appointments, check-ins, sample medical records for all eight demo patients, and sample invoices. Its temporary remote-access grants expire relative to the time the seed runs. Checking a visit out automatically creates one unpaid $10 `Visit completion fee` invoice for that appointment. After a receptionist checks a patient in, the app offers to show and print that patient's Code 39 wristband barcode; the barcode contains only the patient ID. The receptionist can reprint it later from Register Patient / Barcode. The appointment screen writes a printable HTML invoice to `Documents/Forceps/Invoices` and can open it for printing. Do not rerun the seed script on a populated database.
 
@@ -30,6 +31,8 @@ If the database already has Staff, User_account, Patient, Appointment, Nurse, an
 If Medical_Record does not exist yet, run `sql/medical_billing.sql`. If it already exists, run `sql/medical_record_vitals_migration.sql` once instead. Then run `sql/procedures_triggers.sql` and `sql/medical_billing_procedures.sql` to replace the existing procedures with the updated versions. These two procedure scripts can be rerun safely; the data seed cannot.
 
 Existing appointments remain unassigned until a receptionist uses **Assign / change nurse**. Existing appointment rows with visit history are cancelled rather than deleted when removed, preserving the foreign-key history.
+
+Apply `sql/audit_log_migration.sql` once to existing databases before using the System Administrator **Audit trail** tab. The screen supports filtering by staff, patient, action, and date; audit events are intended to be append-only.
 
 ## Local connection settings
 

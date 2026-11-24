@@ -1,6 +1,7 @@
 package views;
 
 import database.DatabaseConnection;
+import database.AuditLogger;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
@@ -40,18 +41,24 @@ public class AppointmentsPanel extends JPanel {
             JButton checkIn = new JButton("Check in selected");
             JButton checkOut = new JButton("Check out / create invoice");
             JButton book = new JButton("Book appointment");
+            JButton bookNew = new JButton("Book first appointment");
             JButton assignNurse = new JButton("Assign / change nurse");
             JButton delete = new JButton("Delete / cancel selected");
+            JButton noShow = new JButton("Mark no-show");
             actions.add(checkIn);
             actions.add(checkOut);
             actions.add(book);
+            actions.add(bookNew);
             actions.add(assignNurse);
             actions.add(delete);
+            actions.add(noShow);
             checkIn.addActionListener(e -> checkInSelected());
             checkOut.addActionListener(e -> checkOutSelected());
             book.addActionListener(e -> bookAppointment());
+            bookNew.addActionListener(e -> bookProspectiveAppointment());
             assignNurse.addActionListener(e -> assignNurse());
             delete.addActionListener(e -> deleteSelected());
+            noShow.addActionListener(e -> markNoShow());
         }
         add(actions, BorderLayout.NORTH);
         table.setAutoCreateRowSorter(true);
@@ -89,23 +96,30 @@ public class AppointmentsPanel extends JPanel {
         int row = selectedModelRow();
         if (row < 0) { showMessage("Select an appointment first."); return; }
         Object patientValue = model.getValueAt(row, 1);
-        if (patientValue == null) {
-            showMessage("Register this walk-in as a patient before check-in so the visit can be billed.");
-            return;
-        }
         if (model.getValueAt(row, 8) != null) { showMessage("This appointment already has a visit."); return; }
         long appointmentId = ((Number) model.getValueAt(row, 0)).longValue();
-        try (Connection c = DatabaseConnection.getConnection(); CallableStatement q = c.prepareCall("{CALL log_visit_check_in(?, ?, ?)}")) {
-            q.setNull(1, Types.BIGINT); // Visit IDs are allocated by MySQL.
-            q.setLong(2, appointmentId);
-            q.setLong(3, staffId);
-            q.execute();
+        long patientId;
+        try (Connection c = DatabaseConnection.getConnection()) {
+            if (patientValue == null) {
+                try (CallableStatement q = c.prepareCall("{CALL register_and_check_in_prospective(?, ?, ?, ?)}")) {
+                    q.setLong(1, appointmentId); q.setLong(2, staffId);
+                    q.registerOutParameter(3, Types.BIGINT); q.registerOutParameter(4, Types.BIGINT);
+                    q.execute(); patientId = q.getLong(3);
+                }
+            } else {
+                patientId = ((Number) patientValue).longValue();
+                try (CallableStatement q = c.prepareCall("{CALL log_visit_check_in(?, ?, ?)}")) {
+                    q.setNull(1, Types.BIGINT); // Visit IDs are allocated by MySQL.
+                    q.setLong(2, appointmentId); q.setLong(3, staffId); q.execute();
+                }
+            }
+            AuditLogger.logBestEffort(c, staffId, patientId, "PATIENT_CHECK_IN", "APPOINTMENT", Long.toString(appointmentId), "SUCCESS", "Visit created; barcode offered after check-in.");
             loadAppointments();
             if (printPatientBarcode != null) {
                 int choice = JOptionPane.showConfirmDialog(this,
                         "Patient checked in. Print the patient-ID wristband barcode now?",
                         "Check-in complete", JOptionPane.YES_NO_OPTION, JOptionPane.INFORMATION_MESSAGE);
-                if (choice == JOptionPane.YES_OPTION) printPatientBarcode.accept(((Number) patientValue).longValue());
+                if (choice == JOptionPane.YES_OPTION) printPatientBarcode.accept(patientId);
             } else {
                 showMessage("Patient checked in.");
             }
@@ -129,6 +143,7 @@ public class AppointmentsPanel extends JPanel {
                 q.execute(); // The database trigger creates the $10 visit completion invoice.
             }
             Path invoiceFile = saveVisitInvoice(c, appointmentId);
+            AuditLogger.logBestEffort(c, staffId, ((Number) model.getValueAt(row, 1)).longValue(), "PATIENT_CHECK_OUT", "APPOINTMENT", Long.toString(appointmentId), "SUCCESS", "Visit closed and completion invoice generated.");
             loadAppointments();
             int choice = JOptionPane.showConfirmDialog(this,
                     "Visit checked out. The $10 invoice was saved to:\n" + invoiceFile + "\n\nOpen the printable invoice now?",
@@ -193,7 +208,33 @@ public class AppointmentsPanel extends JPanel {
     }
 
     private void bookAppointment() {
-        JTextField patientId = new JTextField(10);
+        JTextField first = new JTextField(18), last = new JTextField(18), dob = new JTextField(12);
+        JPanel identity = new JPanel(new GridLayout(0, 2, 5, 5));
+        identity.add(new JLabel("Patient first name *")); identity.add(first);
+        identity.add(new JLabel("Patient last name *")); identity.add(last);
+        identity.add(new JLabel("Date of birth (YYYY-MM-DD) *")); identity.add(dob);
+        if (JOptionPane.showConfirmDialog(this, identity, "Find existing patient", JOptionPane.OK_CANCEL_OPTION) != JOptionPane.OK_OPTION) return;
+        if (first.getText().trim().isEmpty() || last.getText().trim().isEmpty()) { showMessage("Enter the patient's first and last name."); return; }
+        final java.sql.Date birth;
+        try { birth = java.sql.Date.valueOf(dob.getText().trim()); }
+        catch (IllegalArgumentException ex) { showMessage("Enter date of birth as YYYY-MM-DD."); return; }
+        java.util.List<PatientOption> matches = new java.util.ArrayList<>();
+        String findPatient = "SELECT patient_id,first_name,last_name,date_of_birth FROM Patient WHERE LOWER(first_name)=LOWER(?) AND LOWER(last_name)=LOWER(?) AND date_of_birth=? ORDER BY patient_id";
+        try (Connection c = DatabaseConnection.getConnection(); PreparedStatement q = c.prepareStatement(findPatient)) {
+            q.setString(1, first.getText().trim()); q.setString(2, last.getText().trim()); q.setDate(3, birth);
+            try (ResultSet r = q.executeQuery()) {
+                while (r.next()) matches.add(new PatientOption(r.getLong("patient_id"), r.getString("first_name") + " " + r.getString("last_name") + " — ID " + r.getLong("patient_id")));
+            }
+        } catch (SQLException ex) { showError(ex); return; }
+        if (matches.isEmpty()) { showMessage("No existing patient matched that name and date of birth. Use 'Book first appointment' for a new patient."); return; }
+        PatientOption patient;
+        if (matches.size() == 1) patient = matches.get(0);
+        else {
+            PatientOption[] options = matches.toArray(new PatientOption[0]);
+            patient = (PatientOption) JOptionPane.showInputDialog(this, "More than one patient matched. Confirm the correct patient ID:",
+                    "Select patient", JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
+            if (patient == null) return;
+        }
         JComboBox<StaffOption> doctor = new JComboBox<>();
         JComboBox<StaffOption> nurse = new JComboBox<>();
         JTextField date = new JTextField(LocalDateTime.now().plusDays(1).withMinute(0).withSecond(0).withNano(0).toString(), 18);
@@ -203,35 +244,83 @@ public class AppointmentsPanel extends JPanel {
             loadStaffOptions("Nurse", nurse);
         } catch (SQLException ex) { showError(ex); return; }
         JPanel form = new JPanel(new GridLayout(0, 2, 5, 5));
-        form.add(new JLabel("Patient ID")); form.add(patientId);
+        form.add(new JLabel("Verified patient")); form.add(new JLabel(patient.toString()));
         form.add(new JLabel("Doctor")); form.add(doctor);
         form.add(new JLabel("Assigned nurse")); form.add(nurse);
         form.add(new JLabel("Date/time (YYYY-MM-DDTHH:MM)")); form.add(date);
         form.add(new JLabel("Reason")); form.add(reason);
         if (JOptionPane.showConfirmDialog(this, form, "Book appointment", JOptionPane.OK_CANCEL_OPTION) != JOptionPane.OK_OPTION) return;
         try {
-            long patient = Long.parseLong(patientId.getText().trim());
-            if (patient <= 0 || doctor.getSelectedItem() == null || nurse.getSelectedItem() == null) throw new IllegalArgumentException("Select a patient, doctor, and nurse.");
+            if (doctor.getSelectedItem() == null || nurse.getSelectedItem() == null) throw new IllegalArgumentException("Select a doctor and nurse.");
             Timestamp scheduledAt = Timestamp.valueOf(LocalDateTime.parse(date.getText().trim()));
             try (Connection c = DatabaseConnection.getConnection(); CallableStatement q = c.prepareCall("{CALL book_appointment(?, ?, ?, ?, ?, ?, ?)}")) {
                 q.setNull(1, Types.BIGINT); // MySQL allocates the appointment ID.
-                q.setLong(2, patient);
+                q.setLong(2, patient.id);
                 q.setLong(3, ((StaffOption) doctor.getSelectedItem()).id());
                 q.setLong(4, ((StaffOption) nurse.getSelectedItem()).id());
                 q.setLong(5, staffId);
                 q.setTimestamp(6, scheduledAt);
                 q.setString(7, reason.getText().trim());
                 q.execute();
+                AuditLogger.logBestEffort(c, staffId, patient.id, "APPOINTMENT_BOOKED", "APPOINTMENT", null, "SUCCESS", "Appointment booked for existing patient after name and date-of-birth verification.");
             }
             loadAppointments();
             showMessage("Appointment booked.");
-        } catch (NumberFormatException ex) {
-            showMessage("Enter a positive numeric patient ID.");
         } catch (DateTimeParseException ex) {
             showMessage("Enter the date and time as YYYY-MM-DDTHH:MM.");
         } catch (IllegalArgumentException ex) {
             showMessage(ex.getMessage());
         } catch (SQLException ex) { showError(ex); }
+    }
+
+    private void bookProspectiveAppointment() {
+        JTextField first = new JTextField(18), last = new JTextField(18);
+        JTextField dob = new JTextField("YYYY-MM-DD", 12);
+        JComboBox<StaffOption> doctor = new JComboBox<>(), nurse = new JComboBox<>();
+        JTextField date = new JTextField(LocalDateTime.now().plusDays(1).withMinute(0).withSecond(0).withNano(0).toString(), 18);
+        JTextField reason = new JTextField(24);
+        try { loadStaffOptions("Doctor", doctor); loadStaffOptions("Nurse", nurse); }
+        catch (SQLException ex) { showError(ex); return; }
+        JPanel form = new JPanel(new GridLayout(0, 2, 5, 5));
+        form.add(new JLabel("First name *")); form.add(first);
+        form.add(new JLabel("Last name *")); form.add(last);
+        form.add(new JLabel("Date of birth (YYYY-MM-DD) *")); form.add(dob);
+        form.add(new JLabel("Doctor *")); form.add(doctor);
+        form.add(new JLabel("Assigned nurse *")); form.add(nurse);
+        form.add(new JLabel("Appointment (YYYY-MM-DDTHH:MM) *")); form.add(date);
+        form.add(new JLabel("Reason")); form.add(reason);
+        if (JOptionPane.showConfirmDialog(this, form, "Book first appointment", JOptionPane.OK_CANCEL_OPTION) != JOptionPane.OK_OPTION) return;
+        if (first.getText().trim().isEmpty() || last.getText().trim().isEmpty() || doctor.getSelectedItem()==null || nurse.getSelectedItem()==null) {
+            showMessage("Fill in the required patient and appointment fields."); return;
+        }
+        try {
+            java.time.LocalDate birth = java.time.LocalDate.parse(dob.getText().trim());
+            if (birth.isAfter(java.time.LocalDate.now())) throw new IllegalArgumentException("Date of birth cannot be in the future.");
+            Timestamp scheduled = Timestamp.valueOf(LocalDateTime.parse(date.getText().trim()));
+            try (Connection c=DatabaseConnection.getConnection(); CallableStatement q=c.prepareCall("{CALL book_prospective_appointment(?, ?, ?, ?, ?, ?, ?, ?, ?)}")) {
+                q.setNull(1, Types.BIGINT); q.setString(2, first.getText().trim()); q.setString(3,last.getText().trim());
+                q.setDate(4,Date.valueOf(birth)); q.setLong(5,((StaffOption)doctor.getSelectedItem()).id());
+                q.setLong(6,((StaffOption)nurse.getSelectedItem()).id()); q.setLong(7,staffId); q.setTimestamp(8,scheduled);
+                q.setString(9,reason.getText().trim()); q.execute();
+                AuditLogger.logBestEffort(c,staffId,null,"PROSPECTIVE_APPOINTMENT_BOOKED","APPOINTMENT",null,"SUCCESS","First appointment booked; patient will be registered at check-in.");
+            }
+            loadAppointments(); showMessage("First appointment booked. The patient will be registered and assigned an ID at check-in.");
+        } catch (DateTimeParseException ex) { showMessage("Enter DOB as YYYY-MM-DD and appointment time as YYYY-MM-DDTHH:MM."); }
+        catch (IllegalArgumentException ex) { showMessage(ex.getMessage()); }
+        catch (SQLException ex) { showError(ex); }
+    }
+
+    private void markNoShow() {
+        int row=selectedModelRow();
+        if(row<0){showMessage("Select an appointment first.");return;}
+        if(model.getValueAt(row,8)!=null){showMessage("A checked-in visit cannot be marked no-show.");return;}
+        long id=((Number)model.getValueAt(row,0)).longValue();
+        if(JOptionPane.showConfirmDialog(this,"Mark appointment "+id+" as a no-show?","Confirm no-show",JOptionPane.OK_CANCEL_OPTION)!=JOptionPane.OK_OPTION)return;
+        try(Connection c=DatabaseConnection.getConnection();CallableStatement q=c.prepareCall("{CALL mark_appointment_no_show(?)}")){
+            q.setLong(1,id);q.execute();
+            AuditLogger.logBestEffort(c,staffId,null,"APPOINTMENT_NO_SHOW","APPOINTMENT",Long.toString(id),"SUCCESS","Appointment marked as no-show.");
+            loadAppointments();showMessage("Appointment marked no-show.");
+        }catch(SQLException ex){showError(ex);}
     }
 
     private void deleteSelected() {
@@ -283,6 +372,10 @@ public class AppointmentsPanel extends JPanel {
 
     private record StaffOption(long id, String name) {
         @Override public String toString() { return name + " (" + id + ")"; }
+    }
+
+    private record PatientOption(long id, String name) {
+        @Override public String toString() { return name; }
     }
 
     private void showMessage(String message) { JOptionPane.showMessageDialog(this, message); }

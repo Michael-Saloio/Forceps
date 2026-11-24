@@ -1,6 +1,7 @@
 package views;
 
 import database.DatabaseConnection;
+import database.AuditLogger;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
@@ -74,6 +75,7 @@ public class BillingPanel extends JPanel {
                             r.getBigDecimal("amount"), r.getString("status"), r.getDate("due_date"), r.getDate("paid_date")});
                 }
             }
+            AuditLogger.logBestEffort(c, staffId, id.isEmpty() ? null : Long.parseLong(id), "INVOICES_VIEWED", "INVOICE", null, "SUCCESS", "Invoice list opened.");
             if (model.getRowCount() == 0) JOptionPane.showMessageDialog(this, "No invoices found.");
         } catch (NumberFormatException ex) {
             showMessage("Enter a positive whole-number patient ID.");
@@ -122,6 +124,7 @@ public class BillingPanel extends JPanel {
                     q.setDate(6, due);
                     q.execute();
                 }
+                AuditLogger.logBestEffort(c, staffId, patientValue, "INVOICE_CREATED", "PATIENT", Long.toString(patientValue), "SUCCESS", "Invoice created.");
             }
             patientId.setText(patientKey);
             loadInvoices();
@@ -173,6 +176,7 @@ public class BillingPanel extends JPanel {
                     q.setDate(5, due);
                     q.execute();
                 }
+                AuditLogger.logBestEffort(c, staffId, patientKey, "INVOICE_UPDATED", "INVOICE", Long.toString(invoiceId), "SUCCESS", "Unpaid invoice updated.");
             }
             loadInvoices();
             showMessage("Invoice updated.");
@@ -200,6 +204,7 @@ public class BillingPanel extends JPanel {
         try (Connection c = DatabaseConnection.getConnection(); CallableStatement q = c.prepareCall("{CALL mark_invoice_paid(?, ?)}")) {
             q.setLong(1, invoiceId); q.setLong(2, staffId);
             q.execute();
+            AuditLogger.logBestEffort(c, staffId, ((Number)model.getValueAt(row, 1)).longValue(), "INVOICE_PAID", "INVOICE", Long.toString(invoiceId), "SUCCESS", "Invoice payment recorded.");
             loadInvoices();
             showMessage("Payment recorded.");
         } catch (SQLException ex) {
@@ -228,6 +233,7 @@ public class BillingPanel extends JPanel {
         printable.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
         try {
             if (!printable.print(null, null, true, null, null, true)) showMessage("Printing was cancelled.");
+            else AuditLogger.logBestEffort(staffId, ((Number)model.getValueAt(row, 1)).longValue(), "INVOICE_PRINTED", "INVOICE", String.valueOf(model.getValueAt(row, 0)), "SUCCESS", "Invoice sent to print dialog.");
         } catch (PrinterException ex) {
             showMessage("Unable to print invoice: " + ex.getMessage());
         }
