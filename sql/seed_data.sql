@@ -254,7 +254,7 @@ CALL grant_remote_access(
     10001,  -- patient id 
     90909, -- granted by sys admin staff id
     SHA2('TempAccess111',256), 
-    "2026-11-19 09:00:00"
+    DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 7 DAY)
 );
 CALL grant_remote_access(
     31879, -- access id 
@@ -262,7 +262,7 @@ CALL grant_remote_access(
     10003,  -- patient id 
     90909, -- granted by sys admin staff id
     SHA2('TempAccess222',256), 
-    "2026-12-31 23:59:00"
+    DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 30 DAY)
 );
 CALL revoke_remote_access(44440);
 

@@ -11,11 +11,13 @@ import java.nio.file.Path;
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
+import java.util.function.LongConsumer;
 
 /** Role-filtered appointment list; receptionists can book and remove appointments. */
 public class AppointmentsPanel extends JPanel {
     private final String role;
     private final long staffId;
+    private final LongConsumer printPatientBarcode;
     private final DefaultTableModel model = new DefaultTableModel(
             new Object[]{"Appointment", "Patient ID", "Patient", "Doctor", "Nurse", "Date and time", "Status", "Reason", "Visit ID", "Visit status"}, 0) {
         @Override public boolean isCellEditable(int row, int column) { return false; }
@@ -23,8 +25,13 @@ public class AppointmentsPanel extends JPanel {
     private final JTable table = new JTable(model);
 
     public AppointmentsPanel(String role, long staffId) {
+        this(role, staffId, null);
+    }
+
+    public AppointmentsPanel(String role, long staffId, LongConsumer printPatientBarcode) {
         this.role = role;
         this.staffId = staffId;
+        this.printPatientBarcode = printPatientBarcode;
         setLayout(new BorderLayout(8, 8));
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JButton refresh = new JButton("Refresh appointments");
@@ -94,7 +101,14 @@ public class AppointmentsPanel extends JPanel {
             q.setLong(3, staffId);
             q.execute();
             loadAppointments();
-            showMessage("Patient checked in.");
+            if (printPatientBarcode != null) {
+                int choice = JOptionPane.showConfirmDialog(this,
+                        "Patient checked in. Print the patient-ID wristband barcode now?",
+                        "Check-in complete", JOptionPane.YES_NO_OPTION, JOptionPane.INFORMATION_MESSAGE);
+                if (choice == JOptionPane.YES_OPTION) printPatientBarcode.accept(((Number) patientValue).longValue());
+            } else {
+                showMessage("Patient checked in.");
+            }
         } catch (SQLException ex) { showError(ex); }
     }
 

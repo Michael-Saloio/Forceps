@@ -72,8 +72,7 @@ public class PatientRegistrationPanel extends JPanel {
                 }
             }
             barcodePatientId.setText(Long.toString(patientId));
-            showMessage("Patient registered with ID " + patientId + ". Generate and print the barcode label now.");
-            showBarcode(patientId);
+            showMessage("Patient registered with ID " + patientId + ". After booking and checking in an appointment, the app will offer to print the wristband barcode.");
         } catch (DateTimeParseException ex) {
             showMessage("Enter the date of birth as YYYY-MM-DD.");
         } catch (SQLException ex) {
@@ -85,10 +84,12 @@ public class PatientRegistrationPanel extends JPanel {
         try {
             long id = Long.parseLong(barcodePatientId.getText().trim());
             if (id <= 0) throw new NumberFormatException();
-            try (Connection c = DatabaseConnection.getConnection(); PreparedStatement q = c.prepareStatement("SELECT 1 FROM Patient WHERE patient_id=?")) {
+            String sql = "SELECT 1 FROM Patient p WHERE p.patient_id=? AND EXISTS (" +
+                    "SELECT 1 FROM Appointment a JOIN Visit v ON v.appt_id=a.appt_id WHERE a.patient_id=p.patient_id)";
+            try (Connection c = DatabaseConnection.getConnection(); PreparedStatement q = c.prepareStatement(sql)) {
                 q.setLong(1, id);
                 try (ResultSet r = q.executeQuery()) {
-                    if (!r.next()) { showMessage("No patient found for ID " + id + "."); return; }
+                    if (!r.next()) { showMessage("No checked-in patient found for ID " + id + ". A wristband barcode is available after check-in."); return; }
                 }
             }
             showBarcode(id);
@@ -130,6 +131,13 @@ public class PatientRegistrationPanel extends JPanel {
         dialog.setVisible(true);
     }
 
+    /** Offer the receptionist the patient-ID wristband label after a successful check-in. */
+    public void showBarcodeForPatient(long patientId) {
+        if (patientId <= 0) return;
+        barcodePatientId.setText(Long.toString(patientId));
+        showBarcode(patientId);
+    }
+
     private void setOptional(PreparedStatement q, int index, String value) throws SQLException {
         String trimmed = value.trim();
         if (trimmed.isEmpty()) q.setNull(index, Types.VARCHAR); else q.setString(index, trimmed);
@@ -157,13 +165,14 @@ public class PatientRegistrationPanel extends JPanel {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setColor(Color.BLACK);
             String encoded = "*" + value + "*";
-            int totalUnits = encoded.length() - 1;
+            // Include Code 39's required quiet zones (at least 10 narrow elements on both sides).
+            int totalUnits = encoded.length() - 1 + 20;
             for (int i = 0; i < encoded.length(); i++) {
                 String pattern = CODE39.get(encoded.charAt(i));
                 for (int j = 0; j < pattern.length(); j++) totalUnits += pattern.charAt(j) == 'w' ? 3 : 1;
             }
             int unit = Math.max(1, (getWidth() - 40) / totalUnits);
-            int x = (getWidth() - totalUnits * unit) / 2;
+            int x = (getWidth() - totalUnits * unit) / 2 + 10 * unit;
             int top = 18;
             for (int i = 0; i < encoded.length(); i++) {
                 String pattern = CODE39.get(encoded.charAt(i));

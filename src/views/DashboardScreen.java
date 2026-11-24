@@ -69,11 +69,12 @@ public class DashboardScreen extends JFrame {
 
     private void prepareRoleViews() {
         if (isClinicalRole()) recordsPanel = new MedicalRecordsPanel(staffId, role);
-        if (isClinicalRole() || isReceptionist()) appointmentsPanel = new AppointmentsPanel(role, staffId);
         if (isReceptionist()) {
             billingPanel = new BillingPanel(staffId);
             patientPanel = new PatientRegistrationPanel();
         }
+        if (isClinicalRole()) appointmentsPanel = new AppointmentsPanel(role, staffId);
+        else if (isReceptionist()) appointmentsPanel = new AppointmentsPanel(role, staffId, patientPanel::showBarcodeForPatient);
         if (isAdminRole()) adminPanel = new SystemAdminPanel(staffId);
         if (role.equalsIgnoreCase("Remote Worker")) remotePanel = new RemoteAccessPanel(staffId);
     }
