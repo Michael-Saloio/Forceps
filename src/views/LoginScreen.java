@@ -326,12 +326,7 @@ public class LoginScreen extends JFrame {
     }
 
     public static void main(String[] args) {
-        try {
-            // Set the look and feel to the system's default
-            javax.swing.UIManager.setLookAndFeel(javax.swing.UIManager.getSystemLookAndFeelClassName());
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        UITheme.install();
         SwingUtilities.invokeLater(() -> new LoginScreen().setVisible(true));
     }
 

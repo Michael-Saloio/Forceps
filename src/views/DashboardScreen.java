@@ -29,7 +29,7 @@ public class DashboardScreen extends JFrame {
         this.role = userRole == null ? "" : userRole;
         this.staffId = staffId;
         setTitle("Forceps Hospital Dashboard");
-        setSize(1000, 680);
+        setSize(1180, 760);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLocationRelativeTo(null);
 
@@ -45,8 +45,16 @@ public class DashboardScreen extends JFrame {
         if (adminPanel != null) mainPanel.add(adminPanel, "System Administration");
         if (remotePanel != null) mainPanel.add(remotePanel, "Remote Access");
 
-        JPanel menu = new JPanel(new GridLayout(0, 1, 2, 4));
-        menu.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        JPanel menu = new JPanel();
+        menu.setLayout(new BoxLayout(menu, BoxLayout.Y_AXIS));
+        menu.setBackground(new Color(239, 244, 248));
+        menu.setBorder(BorderFactory.createEmptyBorder(18, 12, 18, 12));
+        menu.setPreferredSize(new Dimension(238, 0));
+        JLabel navigation = new JLabel("WORKSPACE");
+        navigation.setFont(navigation.getFont().deriveFont(Font.BOLD, 12f));
+        navigation.setForeground(new Color(96, 117, 135));
+        navigation.setBorder(BorderFactory.createEmptyBorder(0, 8, 12, 0));
+        menu.add(navigation);
         addNav(menu, "Dashboard", "Home");
         addNav(menu, "Profile", "Profile");
         addNav(menu, "Search Patient", "Search");
@@ -65,8 +73,11 @@ public class DashboardScreen extends JFrame {
         }
         if (remotePanel != null) addNav(menu, "Granted Patient Records", "Remote Access");
 
-        add(menu, BorderLayout.WEST);
-        add(mainPanel, BorderLayout.CENTER);
+        JPanel shell = new JPanel(new BorderLayout());
+        shell.add(menu, BorderLayout.WEST);
+        shell.add(mainPanel, BorderLayout.CENTER);
+        add(topBar(), BorderLayout.NORTH);
+        add(shell, BorderLayout.CENTER);
     }
 
     private void prepareRoleViews() {
@@ -82,18 +93,94 @@ public class DashboardScreen extends JFrame {
     }
 
     private void addNav(JPanel menu, String label, String card) {
-        JButton button = new JButton(label);
+        JButton button = navigationButton(label);
         button.addActionListener(e -> layout.show(mainPanel, card));
         menu.add(button);
+        menu.add(Box.createVerticalStrut(5));
     }
 
     private JPanel homePage() {
-        JPanel panel = new JPanel(new GridLayout(4, 1));
-        panel.add(new JLabel("Welcome to Forceps Hospital"));
-        panel.add(new JLabel("Staff: " + staffName));
-        panel.add(new JLabel("Role: " + role));
-        panel.add(new JLabel("Choose a role-appropriate workflow from the menu."));
+        JPanel panel = new JPanel(new BorderLayout(18, 18));
+        panel.setBackground(new Color(245, 248, 251));
+        panel.setBorder(BorderFactory.createEmptyBorder(30, 34, 30, 34));
+        JPanel welcome = new JPanel();
+        welcome.setOpaque(false);
+        welcome.setLayout(new BoxLayout(welcome, BoxLayout.Y_AXIS));
+        JLabel title = new JLabel("Good day, " + staffName);
+        title.setFont(title.getFont().deriveFont(Font.BOLD, 28f));
+        JLabel subtitle = new JLabel("Your " + role + " workspace is ready. Choose a task to get started.");
+        subtitle.setForeground(new Color(92, 111, 128));
+        subtitle.setBorder(BorderFactory.createEmptyBorder(7, 0, 20, 0));
+        welcome.add(title);
+        welcome.add(subtitle);
+        JPanel tasks = new JPanel(new GridLayout(0, 2, 16, 16));
+        tasks.setOpaque(false);
+        if (isClinicalRole()) {
+            addTaskCard(tasks, "Patient records", "Review diagnoses, treatments, and visit history.", "Open records", () -> layout.show(mainPanel, "Medical Records"));
+            addTaskCard(tasks, "Appointments", "Review your assigned appointments and visits.", "Open appointments", () -> layout.show(mainPanel, "Appointments"));
+        } else if (isReceptionist()) {
+            addTaskCard(tasks, "Patient registration", "Register a patient and print a patient-ID wristband.", "Register patient", () -> layout.show(mainPanel, "Register Patient"));
+            addTaskCard(tasks, "Appointments", "Book, check in, check out, or record a no-show.", "Manage appointments", () -> layout.show(mainPanel, "Appointments"));
+            addTaskCard(tasks, "Billing", "Review, print, and update patient invoices.", "Open billing", () -> layout.show(mainPanel, "Billing"));
+        } else if (isAdminRole()) {
+            for (String tab : new String[]{"Onboard", "Offboard", "Grant remote access", "Revoke remote access", "Manage accounts", "Audit trail"}) {
+                addTaskCard(tasks, tab, "System administration task", "Open " + tab.toLowerCase(), () -> {
+                    adminPanel.showTab(tab); layout.show(mainPanel, "System Administration");
+                });
+            }
+        } else if (role.equalsIgnoreCase("Remote Worker")) {
+            addTaskCard(tasks, "Granted patient records", "Open records only through an active, single-use access grant.", "Open remote access", () -> layout.show(mainPanel, "Remote Access"));
+        }
+        panel.add(welcome, BorderLayout.NORTH);
+        panel.add(tasks, BorderLayout.CENTER);
         return panel;
+    }
+
+    private JPanel topBar() {
+        JPanel bar = new JPanel(new BorderLayout(12, 0));
+        bar.setBackground(new Color(25, 48, 73));
+        bar.setBorder(BorderFactory.createEmptyBorder(13, 22, 13, 22));
+        JLabel brand = new JLabel("FORCEPS  |  Hospital Operations");
+        brand.setForeground(Color.WHITE);
+        brand.setFont(brand.getFont().deriveFont(Font.BOLD, 19f));
+        JLabel identity = new JLabel(staffName + "  ·  " + role);
+        identity.setForeground(new Color(222, 235, 243));
+        bar.add(brand, BorderLayout.WEST);
+        bar.add(identity, BorderLayout.EAST);
+        return bar;
+    }
+
+    private void addTaskCard(JPanel parent, String title, String description, String actionLabel, Runnable action) {
+        JPanel card = new JPanel(new BorderLayout(8, 10));
+        card.setBackground(Color.WHITE);
+        card.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(220, 229, 236)),
+                BorderFactory.createEmptyBorder(16, 18, 16, 18)));
+        JLabel heading = new JLabel(title);
+        heading.setFont(heading.getFont().deriveFont(Font.BOLD, 17f));
+        JLabel details = new JLabel("<html><div style='width:250px'>" + description + "</div></html>");
+        details.setForeground(new Color(92, 111, 128));
+        JButton open = new JButton(actionLabel);
+        open.setFocusPainted(false);
+        open.addActionListener(e -> action.run());
+        JPanel content = new JPanel();
+        content.setOpaque(false);
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+        content.add(heading); content.add(Box.createVerticalStrut(8)); content.add(details);
+        card.add(content, BorderLayout.CENTER); card.add(open, BorderLayout.SOUTH);
+        parent.add(card);
+    }
+
+    private JButton navigationButton(String text) {
+        JButton button = new JButton(text);
+        button.setHorizontalAlignment(SwingConstants.LEFT);
+        button.setMaximumSize(new Dimension(Integer.MAX_VALUE, 42));
+        button.setPreferredSize(new Dimension(210, 42));
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(219, 228, 235)),
+                BorderFactory.createEmptyBorder(7, 10, 7, 10)));
+        return button;
     }
 
     private JPanel profilePage() {
@@ -134,13 +221,13 @@ public class DashboardScreen extends JFrame {
     }
 
     private void addAction(JPanel parent, String title, String card) {
-        JButton button = new JButton(title);
+        JButton button = navigationButton(title);
         button.addActionListener(e -> layout.show(mainPanel, card));
         parent.add(button);
     }
 
     private void addAdminAction(JPanel parent, String title, String tab) {
-        JButton button = new JButton(title);
+        JButton button = navigationButton(title);
         button.addActionListener(e -> {
             adminPanel.showTab(tab);
             layout.show(mainPanel, "System Administration");
@@ -149,12 +236,13 @@ public class DashboardScreen extends JFrame {
     }
 
     private void addAdminNav(JPanel parent, String title, String tab) {
-        JButton button = new JButton(title);
+        JButton button = navigationButton(title);
         button.addActionListener(e -> {
             adminPanel.showTab(tab);
             layout.show(mainPanel, "System Administration");
         });
         parent.add(button);
+        parent.add(Box.createVerticalStrut(5));
     }
 
     private JPanel searchPage() {

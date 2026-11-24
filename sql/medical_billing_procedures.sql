@@ -40,15 +40,16 @@ CREATE PROCEDURE update_medical_record(
     IN p_vitals_summary VARCHAR(500),
     IN p_diagnosis VARCHAR(500),
     IN p_treatment TEXT,
-    IN p_notes TEXT
+    IN p_notes TEXT,
+    IN p_expected_version INT
 )
 BEGIN
-    IF NOT EXISTS(SELECT 1 FROM Medical_Record WHERE record_id=p_record_id) THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Medical record not found.';
-    END IF;
     UPDATE Medical_Record SET height_cm=p_height_cm, weight_kg=p_weight_kg, vitals_summary=p_vitals_summary,
-        diagnosis=p_diagnosis, treatment=p_treatment, notes=p_notes
-    WHERE record_id=p_record_id;
+        diagnosis=p_diagnosis, treatment=p_treatment, notes=p_notes, row_version=row_version+1
+    WHERE record_id=p_record_id AND row_version=p_expected_version;
+    IF ROW_COUNT()=0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'This record changed since you opened it. Refresh the chart and review the latest version before editing again.';
+    END IF;
 END//
 
 DROP PROCEDURE IF EXISTS create_invoice//

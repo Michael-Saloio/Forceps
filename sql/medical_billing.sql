@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS Medical_Record (
     treatment TEXT,
     notes TEXT,
     remote_notes TEXT NULL,
+    row_version INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_medical_record_patient_visit (patient_id, visit_date),
     CONSTRAINT chk_medical_record_height CHECK (height_cm IS NULL OR (height_cm > 0 AND height_cm <= 300)),

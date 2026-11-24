@@ -16,7 +16,7 @@ public class MedicalRecordsPanel extends JPanel {
     private final JTextField patientId = new JTextField(12);
     private final JLabel patientSummary = new JLabel("No patient selected");
     private final DefaultTableModel records = model(
-            "Record", "Patient", "Visit time", "Clinician", "Height cm", "Weight kg", "Vitals", "Diagnosis", "Treatment", "Clinical notes");
+            "Record", "Patient", "Visit time", "Clinician", "Height cm", "Weight kg", "Vitals", "Diagnosis", "Treatment", "Clinical notes", "Version");
     private final DefaultTableModel appointments = model(
             "Appointment", "Date and time", "Patient", "Doctor", "Nurse", "Status", "Reason");
     private final JTable recordsTable = new JTable(records);
@@ -43,6 +43,7 @@ public class MedicalRecordsPanel extends JPanel {
         add(controls, BorderLayout.NORTH);
 
         configureTable(recordsTable);
+        recordsTable.removeColumn(recordsTable.getColumnModel().getColumn(10)); // Concurrency token stays hidden from users.
         configureTable(appointmentsTable);
         JTabbedPane tabs = new JTabbedPane();
         tabs.addTab("Medical records and treatments", new JScrollPane(recordsTable));
@@ -109,7 +110,7 @@ public class MedicalRecordsPanel extends JPanel {
         String sql = "SELECT mr.record_id, p.patient_id, p.first_name, p.last_name, " +
                 "COALESCE(a.scheduled_at, v.check_in_at, mr.visit_date) AS visit_time, " +
                 "CONCAT(s.first_name, ' ', s.last_name) AS clinician, mr.height_cm, mr.weight_kg, " +
-                "mr.vitals_summary, mr.diagnosis, mr.treatment, mr.notes " +
+                "mr.vitals_summary, mr.diagnosis, mr.treatment, mr.notes, mr.row_version " +
                 "FROM Medical_Record mr JOIN Patient p ON p.patient_id=mr.patient_id " +
                 "JOIN Staff s ON s.staff_id=mr.clinician_staff_id " +
                 "LEFT JOIN Visit v ON v.visit_id=mr.visit_id " +
@@ -122,7 +123,7 @@ public class MedicalRecordsPanel extends JPanel {
                         r.getLong("patient_id") + " - " + r.getString("first_name") + " " + r.getString("last_name"),
                         r.getString("visit_time"), r.getString("clinician"), r.getBigDecimal("height_cm"),
                         r.getBigDecimal("weight_kg"), r.getString("vitals_summary"), r.getString("diagnosis"),
-                        r.getString("treatment"), r.getString("notes")});
+                        r.getString("treatment"), r.getString("notes"), r.getInt("row_version")});
             }
         }
     }
@@ -204,6 +205,7 @@ public class MedicalRecordsPanel extends JPanel {
         if (selected < 0) { showMessage("Select a record first."); return; }
         int row = recordsTable.convertRowIndexToModel(selected);
         long recordId = ((Number) records.getValueAt(row, 0)).longValue();
+        int expectedVersion = ((Number) records.getValueAt(row, 10)).intValue();
         JTextField height = new JTextField(textAt(row, 4), 10);
         JTextField weight = new JTextField(textAt(row, 5), 10);
         JTextField vitals = new JTextField(textAt(row, 6), 28);
@@ -223,7 +225,7 @@ public class MedicalRecordsPanel extends JPanel {
         try {
             BigDecimal heightValue = optionalDecimal(height.getText().trim(), "height", new BigDecimal("0"), new BigDecimal("300"));
             BigDecimal weightValue = optionalDecimal(weight.getText().trim(), "weight", new BigDecimal("0"), new BigDecimal("1000"));
-            try (Connection c = DatabaseConnection.getConnection(); CallableStatement q = c.prepareCall("{CALL update_medical_record(?, ?, ?, ?, ?, ?, ?)}")) {
+            try (Connection c = DatabaseConnection.getConnection(); CallableStatement q = c.prepareCall("{CALL update_medical_record(?, ?, ?, ?, ?, ?, ?, ?)}")) {
                 q.setLong(1, recordId);
                 if (heightValue == null) q.setNull(2, Types.DECIMAL); else q.setBigDecimal(2, heightValue);
                 if (weightValue == null) q.setNull(3, Types.DECIMAL); else q.setBigDecimal(3, weightValue);
@@ -231,6 +233,7 @@ public class MedicalRecordsPanel extends JPanel {
                 q.setString(5, diagnosis.getText().trim());
                 q.setString(6, emptyToNull(treatment.getText()));
                 q.setString(7, emptyToNull(notes.getText()));
+                q.setInt(8, expectedVersion);
                 if (q.executeUpdate() == 0) { showMessage("Record no longer exists."); return; }
                 AuditLogger.logBestEffort(c, clinicianStaffId, null, "MEDICAL_RECORD_UPDATED", "MEDICAL_RECORD", Long.toString(recordId), "SUCCESS", "Clinical record updated.");
             }
