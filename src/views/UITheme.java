@@ -36,6 +36,12 @@ final class UITheme {
             UIManager.put("Table.selectionBackground", new Color(202, 231, 239));
             UIManager.put("Table.selectionForeground", navy);
             UIManager.put("Table.gridColor", new Color(226, 233, 239));
+            UIManager.put("Table.rowHeight", 30);
+            UIManager.put("TableHeader.background", new Color(232, 239, 245));
+            UIManager.put("TableHeader.foreground", navy);
+            UIManager.put("TableHeader.font", new FontUIResource("SansSerif", Font.BOLD, 13));
+            UIManager.put("Table.alternateRowColor", new Color(248, 250, 252));
+            UIManager.put("ScrollPane.border", javax.swing.BorderFactory.createEmptyBorder());
         } catch (Exception ex) {
             System.err.println("Could not install the Forceps visual theme: " + ex.getMessage());
         }

@@ -184,12 +184,29 @@ public class AppointmentsPanel extends JPanel {
                         " (ID " + r.getLong("patient_id") + ")") + row("Appointment", Long.toString(appointmentId)) +
                         row("Invoice date", r.getDate("invoice_date").toString()) + row("Due date", r.getDate("due_date").toString()) +
                         row("Status", escapeHtml(r.getString("status"))) + "</table><div class=\"line\"></div><table>" +
-                        row(escapeHtml(r.getString("description")), String.format(java.util.Locale.ROOT, "$%.2f", r.getBigDecimal("amount"))) +
+                        itemizedInvoiceRows(c, appointmentId, r.getBigDecimal("amount")) +
                         "</table><p class=\"muted\">Thank you.</p></body></html>";
                 Files.writeString(file, html, StandardCharsets.UTF_8);
                 return file;
             }
         }
+    }
+
+    private String itemizedInvoiceRows(Connection c, long appointmentId, java.math.BigDecimal total) throws SQLException {
+        StringBuilder rows = new StringBuilder(row("Visit completion fee", "$10.00"));
+        try (PreparedStatement q = c.prepareStatement("SELECT tr.performed_at,tt.type_name,tr.charged_cost FROM Treatment_Record tr " +
+                "JOIN Treatment_Type tt ON tt.type_code=tr.type_code JOIN Visit v ON v.visit_id=tr.visit_id " +
+                "WHERE v.appt_id=? ORDER BY tr.performed_at,tr.treatment_id")) {
+            q.setLong(1, appointmentId);
+            try (ResultSet r = q.executeQuery()) {
+                while (r.next()) {
+                    String label = escapeHtml(r.getString("type_name")) + " — " + escapeHtml(r.getTimestamp("performed_at").toString());
+                    rows.append(row(label, String.format(java.util.Locale.ROOT, "$%.2f", r.getBigDecimal("charged_cost"))));
+                }
+            }
+        }
+        rows.append(row("Total", String.format(java.util.Locale.ROOT, "$%.2f", total)));
+        return rows.toString();
     }
 
     private String row(String label, String value) {

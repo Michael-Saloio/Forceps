@@ -244,8 +244,13 @@ CALL log_visit_check_in(
     00002, -- appt id
     44567890 -- checked in by receptionist staff id 
 );
+CALL add_visit_vital_sign(100001, 11011019, 170.00, 68.50, 72, 118, 76, 36.8, 98.00, 'Seeded annual checkup observations');
+CALL add_treatment_record(100001, 'CONSULT', 11011019, 'Annual health review');
+CALL add_visit_vital_sign(100002, 320006, 145.00, 42.00, 88, 106, 68, 36.7, 99.00, 'Seeded imaging visit observations');
+CALL add_treatment_record(100002, 'IMAGING', 11011019, 'X-ray performed');
 -- CHECK OUT
 CALL log_visit_check_out(100001);
+CALL log_visit_check_out(100002);
 
 -- REMOTE ACCESS 
 CALL grant_remote_access(
@@ -302,5 +307,5 @@ VALUES
 -- Sample invoices for the receptionist billing view.
 INSERT INTO Invoice(patient_id, appointment_id, created_by_staff_id, invoice_date, description, amount, status, due_date, paid_date, paid_by_staff_id)
 VALUES
-    (10001, 1, 44567890, CURRENT_DATE, 'Annual checkup', 75.00, 'UNPAID', DATE_ADD(CURRENT_DATE, INTERVAL 30 DAY), NULL, NULL),
-    (10003, 2, 44567890, CURRENT_DATE, 'X-ray appointment', 125.00, 'PAID', CURRENT_DATE, CURRENT_DATE, 44567890);
+    (10001, NULL, 44567890, CURRENT_DATE, 'Prior annual consultation', 75.00, 'UNPAID', DATE_ADD(CURRENT_DATE, INTERVAL 30 DAY), NULL, NULL),
+    (10005, NULL, 44567890, CURRENT_DATE, 'Routine follow-up', 55.00, 'PAID', CURRENT_DATE, CURRENT_DATE, 44567890);

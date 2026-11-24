@@ -773,11 +773,12 @@ BEGIN
        AND NOT EXISTS (
            SELECT 1
            FROM Invoice i
-           WHERE i.appointment_id = NEW.appt_id
-             AND i.description = 'Visit completion fee'
+           WHERE i.visit_id = NEW.visit_id
+              OR (i.appointment_id = NEW.appt_id AND i.description = 'Visit completion fee')
        ) THEN
         INSERT INTO Invoice (
             patient_id,
+            visit_id,
             appointment_id,
             created_by_staff_id,
             invoice_date,
@@ -788,11 +789,12 @@ BEGIN
         )
         SELECT
             a.patient_id,
+            NEW.visit_id,
             a.appt_id,
             NEW.checked_in_by_staff_id,
             CURRENT_DATE,
             'Visit completion fee',
-            10.00,
+            10.00 + COALESCE((SELECT SUM(tr.charged_cost) FROM Treatment_Record tr WHERE tr.visit_id=NEW.visit_id), 0.00),
             'UNPAID',
             DATE_ADD(CURRENT_DATE, INTERVAL 30 DAY)
         FROM Appointment a

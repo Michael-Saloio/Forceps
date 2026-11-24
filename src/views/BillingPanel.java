@@ -144,6 +144,10 @@ public class BillingPanel extends JPanel {
         if (row < 0) { showMessage("Select an invoice first."); return; }
         String status = String.valueOf(model.getValueAt(row, 7));
         if (!"UNPAID".equalsIgnoreCase(status)) { showMessage("Only unpaid invoices can be edited."); return; }
+        if ("Visit completion fee".equals(String.valueOf(model.getValueAt(row, 5)))) {
+            showMessage("This checkout invoice is generated from the visit and treatment records. Record any care changes in the clinical chart so the itemized bill remains accurate.");
+            return;
+        }
 
         long invoiceId = ((Number) model.getValueAt(row, 0)).longValue();
         long patientKey = ((Number) model.getValueAt(row, 1)).longValue();
@@ -223,7 +227,26 @@ public class BillingPanel extends JPanel {
         text.append("Appointment: ").append(valueOrNone(model.getValueAt(row, 3))).append('\n');
         text.append("Invoice date: ").append(valueOrNone(model.getValueAt(row, 4))).append('\n');
         text.append("Due date: ").append(valueOrNone(model.getValueAt(row, 8))).append("\n\n");
-        text.append("Description: ").append(model.getValueAt(row, 5)).append('\n');
+        String description = String.valueOf(model.getValueAt(row, 5));
+        if ("Visit completion fee".equals(description) && model.getValueAt(row, 3) instanceof Number appointment) {
+            text.append("ITEMIZED CARE\n");
+            text.append(String.format(java.util.Locale.ROOT, "%-42s %10s%n", "Visit completion fee", "$10.00"));
+            try (Connection c = DatabaseConnection.getConnection(); PreparedStatement q = c.prepareStatement(
+                    "SELECT tr.performed_at,tt.type_name,tr.charged_cost FROM Treatment_Record tr " +
+                    "JOIN Treatment_Type tt ON tt.type_code=tr.type_code JOIN Visit v ON v.visit_id=tr.visit_id " +
+                    "WHERE v.appt_id=? ORDER BY tr.performed_at,tr.treatment_id")) {
+                q.setLong(1, appointment.longValue());
+                try (ResultSet r = q.executeQuery()) {
+                    while (r.next()) text.append(String.format(java.util.Locale.ROOT, "%-42s %10.2f  (%s)%n",
+                            r.getString("type_name"), r.getBigDecimal("charged_cost"), r.getTimestamp("performed_at")));
+                }
+            } catch (SQLException ex) {
+                showError(ex); return;
+            }
+            text.append("\n");
+        } else {
+            text.append("Description: ").append(description).append('\n');
+        }
         text.append("Amount: ").append(String.format(java.util.Locale.ROOT, "%.2f", ((Number) model.getValueAt(row, 6)).doubleValue())).append('\n');
         text.append("Status: ").append(model.getValueAt(row, 7)).append('\n');
         text.append("Paid date: ").append(valueOrNone(model.getValueAt(row, 9))).append('\n');
