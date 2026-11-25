@@ -1,6 +1,7 @@
 package views;
 
 import database.DatabaseConnection;
+import database.AuditLogger;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
@@ -94,6 +95,8 @@ public class RemoteAccessPanel extends JPanel {
                 q.execute();
                 patientId = q.getLong(4);
             }
+            AuditLogger.logBestEffort(remoteWorkerStaffId, patientId, "REMOTE_ACCESS_CODE_CONSUMED", "REMOTE_ACCESS",
+                    Long.toString(accessId), "SUCCESS", "Single-use patient access code accepted.");
             loadGrants();
             openPatientRecords(accessId, patientId);
         } catch (SQLException ex) {
@@ -111,10 +114,10 @@ public class RemoteAccessPanel extends JPanel {
 
     private void openPatientRecords(long accessId, long patientId) {
         if (!hasActiveGrant(accessId, patientId)) { showDenied(); loadGrants(); return; }
-        DefaultTableModel records = model("Record", "Visit date", "Diagnosis", "Treatment", "Vitals", "Clinical notes", "Your additional notes");
+        DefaultTableModel records = model("Record", "Visit date", "Diagnosis", "Treatment", "Vitals", "Clinical notes");
         JTable table = new JTable(records);
         table.setAutoCreateRowSorter(true); table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        String sql = "SELECT mr.record_id, mr.visit_date, mr.diagnosis, mr.treatment, mr.vitals_summary, mr.notes, mr.remote_notes " +
+        String sql = "SELECT mr.record_id, mr.visit_date, mr.diagnosis, mr.treatment, mr.vitals_summary, mr.notes " +
                 "FROM Medical_Record mr WHERE mr.patient_id=? AND EXISTS (SELECT 1 FROM Remote_access ra WHERE ra.access_id=? AND ra.staff_id=? " +
                 "AND ra.patient_id=mr.patient_id AND ra.consumed_at IS NOT NULL AND ra.revoked_at IS NULL AND ra.expires_at>CURRENT_TIMESTAMP) " +
                 "ORDER BY mr.visit_date DESC, mr.record_id DESC";
@@ -122,32 +125,12 @@ public class RemoteAccessPanel extends JPanel {
             q.setLong(1, patientId); q.setLong(2, accessId); q.setLong(3, remoteWorkerStaffId);
             try (ResultSet r = q.executeQuery()) {
                 while (r.next()) records.addRow(new Object[]{r.getLong("record_id"), r.getDate("visit_date"), r.getString("diagnosis"),
-                        r.getString("treatment"), r.getString("vitals_summary"), r.getString("notes"), r.getString("remote_notes")});
+                        r.getString("treatment"), r.getString("vitals_summary"), r.getString("notes")});
             }
             if (records.getRowCount() == 0) { showMessage("No medical records are available for this patient."); return; }
-            JButton editNotes = new JButton("Edit your additional note");
-            JPanel view = new JPanel(new BorderLayout(6, 6));
-            view.add(new JScrollPane(table), BorderLayout.CENTER); view.add(editNotes, BorderLayout.SOUTH);
-            editNotes.addActionListener(e -> editRemoteNote(accessId, patientId, records, table));
-            JOptionPane.showMessageDialog(this, view, "Granted patient records", JOptionPane.PLAIN_MESSAGE);
-        } catch (SQLException ex) { showError(ex); }
-    }
-
-    private void editRemoteNote(long accessId, long patientId, DefaultTableModel records, JTable table) {
-        int selected = table.getSelectedRow();
-        if (selected < 0) { showMessage("Select a patient record first."); return; }
-        int row = table.convertRowIndexToModel(selected);
-        long recordId = ((Number) records.getValueAt(row, 0)).longValue();
-        Object current = records.getValueAt(row, 6);
-        JTextArea notes = new JTextArea(current == null ? "" : current.toString(), 5, 40);
-        if (JOptionPane.showConfirmDialog(this, new JScrollPane(notes), "Your additional notes", JOptionPane.OK_CANCEL_OPTION) != JOptionPane.OK_OPTION) return;
-        try (Connection c = DatabaseConnection.getConnection(); CallableStatement q = c.prepareCall("{CALL save_remote_patient_note(?, ?, ?, ?, ?)}")) {
-            String text = notes.getText().trim();
-            q.setLong(1, accessId); q.setLong(2, remoteWorkerStaffId); q.setLong(3, patientId); q.setLong(4, recordId);
-            if (text.isEmpty()) q.setNull(5, Types.VARCHAR); else q.setString(5, text);
-            q.execute();
-            records.setValueAt(text.isEmpty() ? null : text, row, 6);
-            showMessage("Your additional note was saved.");
+            AuditLogger.logBestEffort(remoteWorkerStaffId, patientId, "REMOTE_PATIENT_RECORDS_VIEWED", "REMOTE_ACCESS",
+                    Long.toString(accessId), "SUCCESS", "Granted patient records opened read-only.");
+            JOptionPane.showMessageDialog(this, new JScrollPane(table), "Granted patient records (read-only)", JOptionPane.PLAIN_MESSAGE);
         } catch (SQLException ex) { showError(ex); }
     }
 
