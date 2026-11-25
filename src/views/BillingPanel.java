@@ -1,6 +1,7 @@
 package views;
 
 import database.DatabaseConnection;
+import database.AuditLogger;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
@@ -74,6 +75,7 @@ public class BillingPanel extends JPanel {
                             r.getBigDecimal("amount"), r.getString("status"), r.getDate("due_date"), r.getDate("paid_date")});
                 }
             }
+            AuditLogger.logBestEffort(c, staffId, id.isEmpty() ? null : Long.parseLong(id), "INVOICES_VIEWED", "INVOICE", null, "SUCCESS", "Invoice list opened.");
             if (model.getRowCount() == 0) JOptionPane.showMessageDialog(this, "No invoices found.");
         } catch (NumberFormatException ex) {
             showMessage("Enter a positive whole-number patient ID.");
@@ -122,6 +124,7 @@ public class BillingPanel extends JPanel {
                     q.setDate(6, due);
                     q.execute();
                 }
+                AuditLogger.logBestEffort(c, staffId, patientValue, "INVOICE_CREATED", "PATIENT", Long.toString(patientValue), "SUCCESS", "Invoice created.");
             }
             patientId.setText(patientKey);
             loadInvoices();
@@ -141,6 +144,10 @@ public class BillingPanel extends JPanel {
         if (row < 0) { showMessage("Select an invoice first."); return; }
         String status = String.valueOf(model.getValueAt(row, 7));
         if (!"UNPAID".equalsIgnoreCase(status)) { showMessage("Only unpaid invoices can be edited."); return; }
+        if ("Visit completion fee".equals(String.valueOf(model.getValueAt(row, 5)))) {
+            showMessage("This checkout invoice is generated from the visit and treatment records. Record any care changes in the clinical chart so the itemized bill remains accurate.");
+            return;
+        }
 
         long invoiceId = ((Number) model.getValueAt(row, 0)).longValue();
         long patientKey = ((Number) model.getValueAt(row, 1)).longValue();
@@ -173,6 +180,7 @@ public class BillingPanel extends JPanel {
                     q.setDate(5, due);
                     q.execute();
                 }
+                AuditLogger.logBestEffort(c, staffId, patientKey, "INVOICE_UPDATED", "INVOICE", Long.toString(invoiceId), "SUCCESS", "Unpaid invoice updated.");
             }
             loadInvoices();
             showMessage("Invoice updated.");
@@ -200,6 +208,7 @@ public class BillingPanel extends JPanel {
         try (Connection c = DatabaseConnection.getConnection(); CallableStatement q = c.prepareCall("{CALL mark_invoice_paid(?, ?)}")) {
             q.setLong(1, invoiceId); q.setLong(2, staffId);
             q.execute();
+            AuditLogger.logBestEffort(c, staffId, ((Number)model.getValueAt(row, 1)).longValue(), "INVOICE_PAID", "INVOICE", Long.toString(invoiceId), "SUCCESS", "Invoice payment recorded.");
             loadInvoices();
             showMessage("Payment recorded.");
         } catch (SQLException ex) {
@@ -218,7 +227,26 @@ public class BillingPanel extends JPanel {
         text.append("Appointment: ").append(valueOrNone(model.getValueAt(row, 3))).append('\n');
         text.append("Invoice date: ").append(valueOrNone(model.getValueAt(row, 4))).append('\n');
         text.append("Due date: ").append(valueOrNone(model.getValueAt(row, 8))).append("\n\n");
-        text.append("Description: ").append(model.getValueAt(row, 5)).append('\n');
+        String description = String.valueOf(model.getValueAt(row, 5));
+        if ("Visit completion fee".equals(description) && model.getValueAt(row, 3) instanceof Number appointment) {
+            text.append("ITEMIZED CARE\n");
+            text.append(String.format(java.util.Locale.ROOT, "%-42s %10s%n", "Visit completion fee", "$10.00"));
+            try (Connection c = DatabaseConnection.getConnection(); PreparedStatement q = c.prepareStatement(
+                    "SELECT tr.performed_at,tt.type_name,tr.charged_cost FROM Treatment_Record tr " +
+                    "JOIN Treatment_Type tt ON tt.type_code=tr.type_code JOIN Visit v ON v.visit_id=tr.visit_id " +
+                    "WHERE v.appt_id=? ORDER BY tr.performed_at,tr.treatment_id")) {
+                q.setLong(1, appointment.longValue());
+                try (ResultSet r = q.executeQuery()) {
+                    while (r.next()) text.append(String.format(java.util.Locale.ROOT, "%-42s %10.2f  (%s)%n",
+                            r.getString("type_name"), r.getBigDecimal("charged_cost"), r.getTimestamp("performed_at")));
+                }
+            } catch (SQLException ex) {
+                showError(ex); return;
+            }
+            text.append("\n");
+        } else {
+            text.append("Description: ").append(description).append('\n');
+        }
         text.append("Amount: ").append(String.format(java.util.Locale.ROOT, "%.2f", ((Number) model.getValueAt(row, 6)).doubleValue())).append('\n');
         text.append("Status: ").append(model.getValueAt(row, 7)).append('\n');
         text.append("Paid date: ").append(valueOrNone(model.getValueAt(row, 9))).append('\n');
@@ -228,6 +256,7 @@ public class BillingPanel extends JPanel {
         printable.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
         try {
             if (!printable.print(null, null, true, null, null, true)) showMessage("Printing was cancelled.");
+            else AuditLogger.logBestEffort(staffId, ((Number)model.getValueAt(row, 1)).longValue(), "INVOICE_PRINTED", "INVOICE", String.valueOf(model.getValueAt(row, 0)), "SUCCESS", "Invoice sent to print dialog.");
         } catch (PrinterException ex) {
             showMessage("Unable to print invoice: " + ex.getMessage());
         }

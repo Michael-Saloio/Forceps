@@ -1,5 +1,6 @@
 package views;
 
+import database.DatabaseConnection;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 
@@ -12,6 +13,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.ArrayList;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 
 public class AdminDashboardScreen extends JFrame {
 
@@ -25,19 +28,13 @@ public class AdminDashboardScreen extends JFrame {
     JTextField staffId;
     JTextField firstName;
     JTextField lastName;
-    JTextField dateOfBirth;
 
     JButton searchButton;
     JButton exportButton;
     JButton settingsButton;
-    JButton onBoardButton;
-    JButton offBoardButton;
+    JButton addStaffButton;
     JButton viewRecordButton;
-<<<<<<< HEAD
-    JButton editRecordButton; 
-=======
     JButton editRecordButton;
->>>>>>> develop
     JButton grantRemoteAccessButton;
     JButton revokeRemoteAccessButton;
 
@@ -112,8 +109,6 @@ public class AdminDashboardScreen extends JFrame {
         staffId = new JTextField(15);
         firstName = new JTextField(15);
         lastName = new JTextField(15);
-        dateOfBirth = new JTextField(15);
-
         searchButton = new JButton("Search");
 
         searchInputs.add(new JLabel("Staff ID:"));
@@ -122,14 +117,12 @@ public class AdminDashboardScreen extends JFrame {
         searchInputs.add(firstName);
         searchInputs.add(new JLabel("Last Name:"));
         searchInputs.add(lastName);
-        searchInputs.add(new JLabel("DOB:"));
-        searchInputs.add(dateOfBirth);
         searchInputs.add(searchButton);
 
         searchButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
         // Table for results
-        String[] columns = { "Staff ID", "Role ID", "First Name", "Last Name", "Date of Birth", "Account Active?" };
+        String[] columns = { "Staff ID", "Role ID", "First Name", "Last Name", "Email", "Account Active?" };
 
         // Prevents editing any cell on click or double-click
         model = new DefaultTableModel(columns, 0) {
@@ -139,11 +132,6 @@ public class AdminDashboardScreen extends JFrame {
             }
         };
         table = new JTable(model);
-
-        // Quick mock rows for testing
-        //model.addRow(new Object[]{"101", "Doctor", "Sarah", "Jenkins", "14-05-1988", "Yes"});
-        //model.addRow(new Object[]{"102", "Nurse", "Marcus", "Vance", "22-09-1992", "Yes"});
-        //model.addRow(new Object[]{"103", "Administrator", "Elena", "Rostova", "03-11-1985", "No"});
 
         searchAndTablePanel.add(searchInputs, BorderLayout.NORTH);
         searchAndTablePanel.add(new JScrollPane(table), BorderLayout.CENTER);
@@ -158,51 +146,18 @@ public class AdminDashboardScreen extends JFrame {
 
         JPanel optionsButtonPanel = new JPanel();
 
-<<<<<<< HEAD
-        // Create new staff account 
-        onBoardButton = new JButton("Onboard");
-        onBoardButton.setEnabled(true);
-        onBoardButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        optionsButtonPanel.add(onBoardButton);
-
-        // Removes staff account
-        offBoardButton = new JButton("Offboard");
-        offBoardButton.setEnabled(false);
-        offBoardButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        optionsButtonPanel.add(offBoardButton);
-
-        // Grants remote access
-        grantRemoteAccessButton = new JButton("Grant Remote");
-        grantRemoteAccessButton.setEnabled(false);
-        grantRemoteAccessButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        optionsButtonPanel.add(grantRemoteAccessButton);
-
-        //Removes remote access
-        revokeRemoteAccessButton = new JButton("Revoke Remote");
-        revokeRemoteAccessButton.setEnabled(false);
-        revokeRemoteAccessButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        optionsButtonPanel.add(revokeRemoteAccessButton);
-=======
         // Create new staff account
         addStaffButton = new JButton("Create New Staff Account");
         optionsButtonPanel.add(addStaffButton);
         addStaffButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
->>>>>>> develop
 
         // View record button
         viewRecordButton = new JButton("View");
-        viewRecordButton.setEnabled(false);
+        optionsButtonPanel.add(viewRecordButton).setEnabled(false);
         viewRecordButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        optionsButtonPanel.add(viewRecordButton);
 
         // Edit record button
         editRecordButton = new JButton("Edit Record");
-<<<<<<< HEAD
-        editRecordButton.setEnabled(false);
-        editRecordButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        optionsButtonPanel.add(editRecordButton);
-
-=======
         optionsButtonPanel.add(editRecordButton).setEnabled(false);
         editRecordButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
@@ -215,7 +170,6 @@ public class AdminDashboardScreen extends JFrame {
         revokeRemoteAccessButton.setEnabled(false);
         optionsButtonPanel.add(revokeRemoteAccessButton);
         revokeRemoteAccessButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
->>>>>>> develop
         southPanel.add(optionsButtonPanel, BorderLayout.EAST);
 
         return southPanel;
@@ -250,7 +204,7 @@ public class AdminDashboardScreen extends JFrame {
             }
         });
 
-        // Controls view/edit/offboard buttons based on table selection
+        // Controls view/edit buttons based on table selection
         table.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
                 int selectedRow = table.getSelectedRow();
@@ -263,16 +217,10 @@ public class AdminDashboardScreen extends JFrame {
                 }
 
                 // Enable/Disable buttons based on selection status
-                grantRemoteAccessButton.setEnabled(hasSelection);
-                revokeRemoteAccessButton.setEnabled(hasSelection);
                 viewRecordButton.setEnabled(hasSelection);
                 editRecordButton.setEnabled(hasSelection);
-<<<<<<< HEAD
-                offBoardButton.setEnabled(hasSelection);
-=======
                 grantRemoteAccessButton.setEnabled(hasSelection);
                 revokeRemoteAccessButton.setEnabled(hasSelection);
->>>>>>> develop
             }
         });
 
@@ -311,30 +259,9 @@ public class AdminDashboardScreen extends JFrame {
         });
 
         // Opens Add New Staff screen
-        onBoardButton.addActionListener(e -> {
+        addStaffButton.addActionListener(e -> {
             StaffDetailsScreen addScreen = new StaffDetailsScreen(StaffDetailsScreen.FormMode.ADD, null);
             addScreen.setVisible(true);
-        });
-
-        // Opens remove staff screen
-        offBoardButton.addActionListener(e -> {
-            SwingUtilities.invokeLater(() -> new OffBoardStaffScreen(selectedStaffId).setVisible(true));
-        });
-
-        // Opens grant remote screen
-        grantRemoteAccessButton.addActionListener(e -> {
-            if (selectedStaffId != null) {
-                GrantRemoteAccessScreen remoteAccessScreen = new GrantRemoteAccessScreen(selectedStaffId);
-                remoteAccessScreen.setVisible(true);
-            }
-        });
-
-        // Opens revoke remote screen
-        revokeRemoteAccessButton.addActionListener(e -> {
-            if (selectedStaffId != null) {
-                RevokeRemoteAccessScreen revokeScreen = new RevokeRemoteAccessScreen(selectedStaffId);
-                revokeScreen.setVisible(true);
-            }
         });
 
         // Opens View mode
@@ -363,17 +290,62 @@ public class AdminDashboardScreen extends JFrame {
             if (selectedStaffId != null) new RevokeRemoteAccessScreen(selectedStaffId).setVisible(true);
         });
 
-        // Future feature to be implemented, currently a placeholder
-        exportButton.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this, "This feature is a work in progress.", "Export Data",
-                    JOptionPane.WARNING_MESSAGE);
-        });
+        exportButton.addActionListener(e -> exportSearchResults());
+        settingsButton.addActionListener(e -> showConnectionSettings());
+    }
 
-        // Future feature to be implemented, currently a placeholder
-        settingsButton.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this, "This feature is a work in progress.", "Settings",
-                    JOptionPane.WARNING_MESSAGE);
-        });
+    private void exportSearchResults() {
+        if (model.getRowCount() == 0) {
+            JOptionPane.showMessageDialog(this, "Search for staff records before exporting.");
+            return;
+        }
+        JFileChooser chooser = new JFileChooser();
+        chooser.setSelectedFile(new java.io.File("forceps-staff.csv"));
+        if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
+        java.io.File file = chooser.getSelectedFile();
+        try (java.io.BufferedWriter writer = Files.newBufferedWriter(file.toPath(), StandardCharsets.UTF_8)) {
+            for (int col = 0; col < model.getColumnCount(); col++) {
+                if (col > 0) writer.write(',');
+                writer.write(csv(String.valueOf(model.getColumnName(col))));
+            }
+            writer.newLine();
+            for (int row = 0; row < model.getRowCount(); row++) {
+                for (int col = 0; col < model.getColumnCount(); col++) {
+                    if (col > 0) writer.write(',');
+                    Object value = model.getValueAt(row, col);
+                    writer.write(csv(value == null ? "" : value.toString()));
+                }
+                writer.newLine();
+            }
+            JOptionPane.showMessageDialog(this, "Exported " + model.getRowCount() + " staff records to " + file.getAbsolutePath());
+        } catch (java.io.IOException ex) {
+            JOptionPane.showMessageDialog(this, "Export failed: " + ex.getMessage(), "Export Data", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private String csv(String value) { return "\"" + value.replace("\"", "\"\"") + "\""; }
+
+    private void showConnectionSettings() {
+        String url = setting("FORCEPS_DB_URL", "jdbc:mysql://localhost:3306/forceps");
+        String user = setting("FORCEPS_DB_USER", "root");
+        JTextField urlField = new JTextField(url, 34); urlField.setEditable(false);
+        JTextField userField = new JTextField(user, 18); userField.setEditable(false);
+        JPanel panel = new JPanel(new GridLayout(0, 2, 6, 6));
+        panel.add(new JLabel("Database URL")); panel.add(urlField);
+        panel.add(new JLabel("Database user")); panel.add(userField);
+        panel.add(new JLabel("Password")); panel.add(new JLabel("Stored in FORCEPS_DB_PASSWORD; hidden"));
+        int choice = JOptionPane.showConfirmDialog(this, panel, "Database Settings", JOptionPane.OK_CANCEL_OPTION, JOptionPane.INFORMATION_MESSAGE);
+        if (choice != JOptionPane.OK_OPTION) return;
+        try (Connection connection = DatabaseConnection.getConnection()) {
+            JOptionPane.showMessageDialog(this, "Database connection succeeded.", "Database Settings", JOptionPane.INFORMATION_MESSAGE);
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this, "Database connection failed: " + ex.getMessage(), "Database Settings", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private String setting(String key, String fallback) {
+        String value = System.getenv(key);
+        return value == null || value.isBlank() ? fallback : value;
     }
 
     // Validates search criteria by checkign to see if at least one input was given
