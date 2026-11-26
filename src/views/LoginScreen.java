@@ -277,7 +277,8 @@ public class LoginScreen extends JFrame {
                 // Compare the stored hash with the hash of the entered password
                 if (storedPassword.equals(hashedEnteredPassword)) {
 
-                    AuditLogger.logBestEffort(staffId, null, "LOGIN_SUCCEEDED", "USER_ACCOUNT", Long.toString(userId), "SUCCESS", "Staff login succeeded.");
+                    AuditLogger.logBestEffort(staffId, null, "LOGIN_SUCCEEDED", "USER_ACCOUNT", Long.toString(userId),
+                            "SUCCESS", "Staff login succeeded.");
 
                     JOptionPane.showMessageDialog(
                             this,
@@ -289,9 +290,9 @@ public class LoginScreen extends JFrame {
                                     + role,
                             "Login Successful",
                             JOptionPane.INFORMATION_MESSAGE);
-                   new DashboardScreen(
-                        firstName + " " + lastName, role, staffId ).setVisible(true);
-                        dispose();
+                    new DashboardScreen(
+                            firstName + " " + lastName, role, staffId).setVisible(true);
+                    dispose();
 
                 } else {
                     // Password was incorrect
